@@ -57,6 +57,10 @@ impl Ast {
         }
         Self { inner }
     }
+
+    pub fn lines(&self) -> impl Iterator<Item = &Line> {
+        self.inner.iter()
+    }
 }
 
 pub enum Line {
@@ -70,6 +74,7 @@ pub enum Expr {
     Op(Box<Expr>, Operation, Box<Expr>),
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Operation {
     Mul,
     Sub,
@@ -100,7 +105,7 @@ impl Operation {
 
 pub enum Val {
     Var(String),
-    V(f64),
+    V(i64),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -113,23 +118,21 @@ impl Line {
     fn parse(stream: &mut TokenStream) -> Result<Self, AstErr> {
         let r = match stream.peek() {
             Token::Ident(i) => match i {
-                &"let" => {
-                    stream.advance();
-                    let Token::Ident(i) = stream.next() else {
-                        return Err(AstErr::BadToken);
-                    };
-                    let i = i.to_string();
-                    let Token::Eq = stream.next() else {
-                        return Err(AstErr::BadToken);
-                    };
-                    Ok(Self::Decl(i, parse_expr(stream, 0.)?))
-                }
                 i if is_func(i) => {
                     let i = i.to_string();
                     stream.advance();
                     Ok(Self::Call(i, parse_expr(stream, 0.)?))
                 }
-                _ => Ok(Self::Expr(parse_expr(stream, 0.)?)),
+                i => {
+                    if stream.peekn(1) == &Token::Eq {
+                        let i = i.to_string();
+                        stream.advance();
+                        stream.advance();
+                        Ok(Self::Decl(i, parse_expr(stream, 0.)?))
+                    } else {
+                        Ok(Self::Expr(parse_expr(stream, 0.)?))
+                    }
+                }
             },
             Token::EOF => return Err(AstErr::Eof),
             _ => Ok(Self::Expr(parse_expr(stream, 0.)?)),
@@ -147,7 +150,7 @@ impl Val {
             return Err(AstErr::BadToken);
         };
 
-        Ok(t.parse::<f64>()
+        Ok(t.parse::<i64>()
             .map(|v| Self::V(v))
             .unwrap_or(Self::Var(t.to_string())))
     }
@@ -208,15 +211,16 @@ impl Display for Ast {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn ast() {
         let s = "
-          let x = 1+ 2;
+          x = 1+ 2;
           print x * (5+2);
-          let y = x / (3 + 2);
+          y = x / (3 + 2);
           x + y / 5 * 4;
         ";
         let mut stream = TokenStream::from_str(s).unwrap();

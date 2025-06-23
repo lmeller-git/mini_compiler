@@ -2,14 +2,17 @@
 use frontend::get_ast;
 
 mod backend;
-mod frontend;
+pub mod frontend;
 
 fn main() {
     let s = "
-        let x = 1 + 2;
-        print x;
-        let y = x * (5 + 1 - 2 / 2);
+    x = 1 + 2;
+    print x + 42;
+    y =  x/ 6 % 5;
         ";
     let ast = get_ast(s).unwrap();
     println!("{}", ast);
+    let code = backend::generate(&ast).unwrap();
+    println!("{:#?}", code);
+    _ = backend::asm_gen(code, "test.asm");
 }

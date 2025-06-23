@@ -111,8 +111,11 @@ impl<'a> TokenStream<'a> {
         self.inner.get(self.cursor).unwrap_or(&Token::EOF)
     }
 
-    pub fn peekn(&self, n: usize) -> &[Token<'_>] {
-        &self.inner[self.cursor..(self.cursor + n).min(self.inner.len())]
+    pub fn peekn(&self, n: usize) -> &Token<'_> {
+        &self
+            .inner
+            .get((self.cursor + n).min(self.inner.len()))
+            .unwrap_or(&Token::EOF)
     }
 
     fn push(&mut self, token: Token<'a>) {
@@ -148,6 +151,7 @@ pub enum LexErr {
     General,
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -164,11 +168,10 @@ mod tests {
             vec![Token::Ident("foo"), Token::Semi, Token::EOF]
         );
 
-        let line = "let foo = 5;";
+        let line = "foo = 5;";
         assert_eq!(
             TokenStream::from_str(line).unwrap().inner,
             vec![
-                Token::Ident("let"),
                 Token::Ident("foo"),
                 Token::Eq,
                 Token::Ident("5"),

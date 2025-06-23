@@ -1,7 +1,7 @@
 use ast::Ast;
 use lexer::{LexErr, TokenStream};
 
-mod ast;
+pub mod ast;
 mod lexer;
 
 pub fn get_ast(s: &str) -> Result<Ast, FrontendErr> {
