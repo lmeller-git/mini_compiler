@@ -16,8 +16,7 @@ pub struct AsmWriter {
 }
 
 impl AsmWriter {
-    pub fn new(path: &str) -> Self {
-        let path = Path::new(path);
+    pub fn new(path: &Path) -> Self {
         let mut file = File::create(path).unwrap();
 
         write!(

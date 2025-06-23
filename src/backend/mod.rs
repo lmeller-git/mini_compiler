@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use codegen::{CodeBuilder, CodeTree, x86_64::AsmWriter};
 
 use crate::frontend::ast::Ast;
@@ -15,7 +17,7 @@ pub fn generate(ast: &Ast) -> Result<CodeTree, BackendErr> {
     Ok(CodeBuilder::new().build(ast))
 }
 
-pub fn asm_gen(code: CodeTree, name: &str) -> Result<(), BackendErr> {
+pub fn asm_gen(code: CodeTree, name: &Path) -> Result<(), BackendErr> {
     AsmWriter::new(name).write(&code);
     Ok(())
 }
