@@ -15,3 +15,19 @@ valid exprs use basic math operators and parentheses:
 
 print stuff with:  
 ```print <expr>;```
+
+## Usage
+
+write your code into some file, then call
+
+```cargo run --release -- <file>```
+
+this will create target/ in the parent of <file> and fill it with <file_name>.asm, <file_name>.o and <file_name>.
+
+To run the binary simply call target/<file_name>
+
+## Supported targets
+
+currently onle x86_64 linux is supported.
+
+All targets depend on gcc and nasm.
