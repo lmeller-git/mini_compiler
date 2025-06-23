@@ -22,7 +22,7 @@ write your code into some file, then call
 
 ```cargo run --release -- <file>```
 
-this will create target/ in the parent of <file> and fill it with <file_name>.asm, <file_name>.o and <file_name>.
+this will create target/ in the parent of your file and fill it with <file_name>.asm, <file_name>.o and <file_name>.
 
 To run the binary simply call target/<file_name>
 
