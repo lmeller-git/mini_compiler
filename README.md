@@ -5,7 +5,7 @@ A minimal example compiler
 ## Syntax
 
 declare a variable with:  
-```let <var> = <expr>;```
+```<var> = <expr>;```
 
 everything else are exprs
 
