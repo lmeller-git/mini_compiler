@@ -5,6 +5,11 @@ mod backend;
 mod frontend;
 
 fn main() {
-    let s = "1 + 2";
-    let _ = get_ast(s);
+    let s = "
+        let x = 1 + 2;
+        print x;
+        let y = x * (5 + 1 - 2 / 2);
+        ";
+    let ast = get_ast(s).unwrap();
+    println!("{}", ast);
 }
