@@ -28,6 +28,6 @@ To run the binary simply call target/<file_name>
 
 ## Supported targets
 
-currently onle x86_64 linux is supported.
+currently only x86_64 linux is supported.
 
 All targets depend on gcc and nasm.
