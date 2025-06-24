@@ -4,6 +4,7 @@ use std::{
     io::{ErrorKind, Read},
     path::{Path, PathBuf},
     process::Command,
+    sync::atomic::{AtomicU8, Ordering},
 };
 
 use clap::Parser;
@@ -20,18 +21,22 @@ struct ParserImpl {
     verbosity: u8,
 }
 
+pub static VERBOSITY: AtomicU8 = AtomicU8::new(0);
+
 fn main() {
     let args = ParserImpl::parse();
+    VERBOSITY.store(args.verbosity, Ordering::Relaxed);
     let mut contents = File::open(&args.file).unwrap();
     let mut s = String::new();
     contents.read_to_string(&mut s).unwrap();
     let ast = get_ast(&s).unwrap();
-    if args.verbosity > 1 {
-        println!("{}", ast);
-    }
+
+    print_if!(2, "{}", ast);
 
     let mut dir = args.file.parent().unwrap_or(Path::new(".")).to_path_buf();
-    dir.push("./target");
+    dir.push("target");
+
+    print_if!(1, "generating code in {}", dir.display());
 
     let f_name = args
         .file
@@ -49,22 +54,38 @@ fn main() {
         e => panic!("could not create target/, {:#?}", e),
     }
     let code = backend::generate(&ast).unwrap();
-    if args.verbosity > 1 {
-        println!("{:#?}", code);
-    }
+
+    print_if!(2, "{:#?}", code);
+
     _ = backend::asm_gen(code, &dir.join(format!("{}.asm", f_name)));
 
+    print_if!(
+        1,
+        "generating {0}.o from {0}.asm",
+        dir.join(format!("{}", f_name)).display()
+    );
+
     assemble(&dir.join(format!("{}.asm", f_name)), f_name);
+
+    print_if!(
+        1,
+        "{} succesfully generated",
+        dir.join(format!("{}.o", f_name)).display()
+    );
+
     link_with_gcc(&dir.join(format!("{}.o", f_name)), f_name);
 
-    if args.verbosity > 0 {
-        println!("code succesfully generated in {}/{}", dir.display(), f_name);
-    }
+    print_if!(
+        0,
+        "code succesfully generated in {}/{}",
+        dir.display(),
+        f_name
+    );
 }
 
 fn assemble(f: &Path, f_name: &str) {
     let status = Command::new("nasm")
-        .args(&[
+        .args([
             "-f",
             "elf64",
             f.to_str().unwrap(),
@@ -78,7 +99,7 @@ fn assemble(f: &Path, f_name: &str) {
 
 fn link_with_gcc(f: &Path, f_name: &str) {
     let status = Command::new("gcc")
-        .args(&[
+        .args([
             "-no-pie",
             f.to_str().unwrap(),
             "-o",
@@ -87,4 +108,18 @@ fn link_with_gcc(f: &Path, f_name: &str) {
         .status()
         .expect("failed to run gcc");
     assert!(status.success(), "gcc failed");
+}
+
+#[macro_export]
+macro_rules! print_if {
+    ($min_verbosity:expr) => {
+        if $crate::VERBOSITY.load(Ordering::Relaxed) > $min_verbosity {
+            println!();
+        }
+    };
+    ($min_verbosity:expr, $($arg:tt)*) => {
+        if $crate::VERBOSITY.load(Ordering::Relaxed) > $min_verbosity {
+            println!("{}", format_args!($($arg)*))
+        }
+    };
 }
