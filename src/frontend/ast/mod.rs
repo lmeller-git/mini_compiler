@@ -4,7 +4,7 @@ use super::lexer::{Token, TokenStream};
 
 fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
     let mut lhs = match stream.peek() {
-        Token::Ident(_) => Expr::Val(Val::parse(stream)?),
+        Token::Ident(_) | Token::Lit(_) => Expr::Val(Val::parse(stream)?),
         Token::OpenParen => {
             stream.advance();
             let lhs = parse_expr(stream, 0.)?;
@@ -18,7 +18,7 @@ fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
     loop {
         match stream.peek() {
             Token::EOF | Token::CloseParen | Token::Semi => break,
-            Token::Ident(_) => return Err(AstErr::BadToken),
+            Token::Ident(_) | Token::Lit(_) => return Err(AstErr::BadToken),
             tok => {
                 let op = Operation::from_token(tok)?;
                 let (r, l) = op.infix_power();
@@ -37,6 +37,7 @@ fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
 fn is_func(ident: &str) -> bool {
     match ident {
         "print" => true,
+        "print_str" => true,
         _ => false,
     }
 }
@@ -81,11 +82,13 @@ pub enum Operation {
     Add,
     Div,
     Mod,
+    Load,
 }
 
 impl Operation {
     fn infix_power(&self) -> (f32, f32) {
         match self {
+            Self::Load => (3.1, 3.),
             Self::Mul | Self::Div | Self::Mod => (2.1, 2.),
             Self::Sub | Self::Add => (1., 1.1),
         }
@@ -106,6 +109,7 @@ impl Operation {
 pub enum Val {
     Var(String),
     V(i64),
+    Lit(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -146,13 +150,17 @@ impl Line {
 
 impl Val {
     fn parse(stream: &mut TokenStream) -> Result<Self, AstErr> {
-        let Token::Ident(t) = stream.next() else {
-            return Err(AstErr::BadToken);
-        };
-
-        Ok(t.parse::<i64>()
-            .map(|v| Self::V(v))
-            .unwrap_or(Self::Var(t.to_string())))
+        Ok(match stream.next() {
+            Token::Ident(t) => t
+                .parse::<i64>()
+                .map(|v| Self::V(v))
+                .unwrap_or(Self::Var(t.to_string())),
+            Token::Lit(t) => t
+                .parse::<i64>()
+                .map(|v| Self::V(v))
+                .unwrap_or(Self::Lit(t.to_string())),
+            _ => return Err(AstErr::BadToken),
+        })
     }
 }
 
@@ -167,6 +175,7 @@ impl Display for Val {
         match self {
             Self::Var(i) => write!(f, "{}", i),
             Self::V(v) => write!(f, "{}", v),
+            Self::Lit(lit) => write!(f, "{}", lit),
         }
     }
 }
@@ -179,6 +188,7 @@ impl Display for Operation {
             Self::Add => write!(f, "+"),
             Self::Div => write!(f, "/"),
             Self::Mod => write!(f, "%"),
+            Self::Load => write!(f, "lea"),
         }
     }
 }

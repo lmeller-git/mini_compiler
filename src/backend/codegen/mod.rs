@@ -1,14 +1,33 @@
+use std::{collections::HashMap, fmt::Display};
+
 use crate::frontend::ast::{Ast, Expr, Line, Operation, Val};
 pub mod x86_64;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CodeTree {
+    data: HashMap<DataUnit, String>,
     units: Vec<CodeUnit>,
 }
 
 impl CodeTree {
     fn new() -> Self {
-        Self { units: Vec::new() }
+        Self {
+            data: HashMap::new(),
+            units: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum DataUnit {
+    StrLit(String),
+}
+
+impl DataUnit {
+    pub fn write_data(&self) -> &str {
+        match self {
+            Self::StrLit(lit) => &lit,
+        }
     }
 }
 
@@ -35,6 +54,15 @@ pub enum Operand {
     Immediate(i64),
     Variable(String),
     Temp(String),
+}
+
+impl Display for Operand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Immediate(value) => write!(f, "{value}"),
+            Self::Variable(var) | Self::Temp(var) => write!(f, "{var}"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -89,6 +117,24 @@ impl CodeBuilder {
             Expr::Val(v) => match v {
                 Val::Var(name) => Operand::Variable(name.clone()),
                 Val::V(val) => Operand::Immediate(*val),
+                Val::Lit(lit) => {
+                    let unit = DataUnit::StrLit(lit.clone());
+                    let temp_var = if let Some(temp_var) = self.inner.data.get(&unit) {
+                        temp_var.clone()
+                    } else {
+                        let new_temp = self.new_temp();
+                        self.inner.data.insert(unit, new_temp.clone());
+                        new_temp
+                    };
+                    let in_scope_temp = self.new_temp();
+                    self.inner.units.push(CodeUnit::Operation {
+                        op: Operation::Load,
+                        lhs: Operand::Immediate(0), // random value. will be overwitten by load
+                        rhs: Operand::Variable(temp_var),
+                        dest: Operand::Temp(in_scope_temp.clone()),
+                    });
+                    Operand::Temp(in_scope_temp)
+                }
             },
             Expr::Op(lhs, op, rhs) => {
                 let lhs = self.lower_unit(lhs.as_ref());
@@ -122,6 +168,7 @@ mod tests {
         let ast = get_ast(s).unwrap();
         let code = CodeBuilder::new().build(&ast);
         let code_true = CodeTree {
+            data: HashMap::new(),
             units: vec![
                 CodeUnit::Operation {
                     op: Operation::Mul,

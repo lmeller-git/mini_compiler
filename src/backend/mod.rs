@@ -18,7 +18,7 @@ pub fn generate(ast: &Ast) -> Result<CodeTree, BackendErr> {
 }
 
 pub fn asm_gen(code: CodeTree, name: &Path) -> Result<(), BackendErr> {
-    AsmWriter::new(name).write(&code);
+    AsmWriter::new(name, &code).write(&code);
     Ok(())
 }
 

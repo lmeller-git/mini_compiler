@@ -16,13 +16,23 @@ pub struct AsmWriter {
 }
 
 impl AsmWriter {
-    pub fn new(path: &Path) -> Self {
+    pub fn new(path: &Path, code: &CodeTree) -> Self {
         let mut file = File::create(path).unwrap();
         print_if!(1, "writing asm code to {}", path.display());
 
-        write!(
+        writeln!(
             file,
-            "section .data\n\tformat db \"%ld\", 10, 0\nsection .text\n\tglobal main\n\textern printf\n\textern exit\n\n"
+            "section .data\n\tformat_int: db \"%ld\", 10, 0\n\tformat_str: db \"%s\", 10, 0"
+        )
+        .unwrap();
+
+        for (payload, ident) in code.data.iter() {
+            writeln!(file, "\t{}: db \"{}\", 0", ident, payload.write_data()).unwrap();
+        }
+
+        writeln!(
+            file,
+            "section .text\n\tglobal main\n\textern printf\n\textern exit\n"
         )
         .unwrap();
 
@@ -45,7 +55,7 @@ impl AsmWriter {
 
                     let func_name = self.get_func_name(name);
                     if self.is_builtin(func_name) {
-                        self.call_builtin(func_name, args, &all_vars, &mut temps);
+                        self.call_builtin(name, args, &all_vars, &mut temps);
                     } else {
                         if USAGE[Reg::RDI as usize].load(Ordering::Relaxed) {
                             self.write_in_fn(format_args!("push rdi"));
@@ -112,6 +122,7 @@ impl AsmWriter {
     fn get_func_name<'a>(&self, name: &'a str) -> &'a str {
         match name {
             "print" => "printf",
+            "print_str" => "printf",
             _ => name,
         }
     }
@@ -128,35 +139,11 @@ impl AsmWriter {
         temps: &mut TempVarTrack,
     ) {
         match name {
-            "printf" => {
-                // TODO should also modify temps accordingly
-                if USAGE[Reg::RSI as usize].load(Ordering::Relaxed) {
-                    self.write_in_fn(format_args!("push rsi"));
-                    temps.inc_stack(8);
-                }
-                if USAGE[Reg::RDI as usize].load(Ordering::Relaxed) {
-                    self.write_in_fn(format_args!("push rdi"));
-                    temps.inc_stack(8);
-                }
-                if !temps.stack_aligned() {
-                    self.write_in_fn(format_args!("sub rsp, 8"));
-                    temps.inc_stack(8);
-                }
-                self.write_in_fn(format_args!(
-                    "mov rsi, {}",
-                    self.get_var_str(&args[0], vars, temps)
-                ));
-                self.write_in_fn(format_args!("mov rdi, format"));
-                self.write_in_fn(format_args!("xor rax, rax"));
-                self.write_in_fn(format_args!("call printf"));
-                if USAGE[Reg::RDI as usize].load(Ordering::Relaxed) {
-                    self.write_in_fn(format_args!("pop rdi"));
-                    temps.dec_stack(8);
-                }
-                if USAGE[Reg::RSI as usize].load(Ordering::Relaxed) {
-                    self.write_in_fn(format_args!("pop rsi"));
-                    temps.dec_stack(8);
-                }
+            "print" => {
+                self.builtin_print(args, vars, temps, "format_int");
+            }
+            "print_str" => {
+                self.builtin_print(args, vars, temps, "format_str");
             }
             "exit" => {
                 if !temps.stack_aligned() {
@@ -167,6 +154,43 @@ impl AsmWriter {
                 self.write_in_fn(format_args!("call exit"));
             }
             _ => {}
+        }
+    }
+
+    fn builtin_print(
+        &mut self,
+        args: &[Operand],
+        vars: &Vars,
+        temps: &mut TempVarTrack,
+        formatter: &str,
+    ) {
+        // TODO should also modify temps accordingly
+        if USAGE[Reg::RSI as usize].load(Ordering::Relaxed) {
+            self.write_in_fn(format_args!("push rsi"));
+            temps.inc_stack(8);
+        }
+        if USAGE[Reg::RDI as usize].load(Ordering::Relaxed) {
+            self.write_in_fn(format_args!("push rdi"));
+            temps.inc_stack(8);
+        }
+        if !temps.stack_aligned() {
+            self.write_in_fn(format_args!("sub rsp, 8"));
+            temps.inc_stack(8);
+        }
+        self.write_in_fn(format_args!(
+            "mov rsi, {}",
+            self.get_var_str(&args[0], vars, temps)
+        ));
+        self.write_in_fn(format_args!("mov rdi, {}", formatter));
+        self.write_in_fn(format_args!("xor rax, rax"));
+        self.write_in_fn(format_args!("call printf"));
+        if USAGE[Reg::RDI as usize].load(Ordering::Relaxed) {
+            self.write_in_fn(format_args!("pop rdi"));
+            temps.dec_stack(8);
+        }
+        if USAGE[Reg::RSI as usize].load(Ordering::Relaxed) {
+            self.write_in_fn(format_args!("pop rsi"));
+            temps.dec_stack(8);
         }
     }
 
@@ -255,6 +279,10 @@ impl AsmWriter {
                     self.write_in_fn(format_args!("pop rcx"));
                     temps.dec_stack(8);
                 }
+                return;
+            }
+            Operation::Load => {
+                self.write_in_fn(format_args!("lea rax, [{}]", rhs));
                 return;
             }
         };

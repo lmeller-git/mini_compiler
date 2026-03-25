@@ -3,6 +3,7 @@ use std::fmt::Display;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token<'a> {
     Ident(&'a str),
+    Lit(&'a str),
     Eq,
     Not,
     NEq,
@@ -28,9 +29,10 @@ impl<'a> Token<'a> {
         }
         let mut n_parsed = 0;
         let token = 'outer: loop {
-            for (i, c) in s2.chars().enumerate() {
-                n_parsed += 1;
+            for (i, c) in s2.char_indices() {
+                n_parsed += c.len_utf8();
                 match c {
+                    '\'' | '\"' => break 'outer Self::parse_quoted(&s2[i..], &mut n_parsed),
                     '+' => break 'outer Token::Add,
                     '-' => break 'outer Token::Sub,
                     '*' => break 'outer Token::Mul,
@@ -66,12 +68,22 @@ impl<'a> Token<'a> {
         Ok((token, n_parsed + (s.len() - s2.len())))
     }
 
+    fn parse_quoted(s: &'a str, counter: &mut usize) -> Self {
+        let quotation_open = s.chars().next().unwrap();
+        let inner_name_end = s[quotation_open.len_utf8()..].find(quotation_open).expect("Quotations can currently not be nested and must be closed using the same qutation mark");
+        let str_lit = &s[quotation_open.len_utf8()..=inner_name_end];
+        *counter += inner_name_end + quotation_open.len_utf8();
+        Self::Lit(str_lit)
+    }
+
     fn parse_single(s: &'a str, counter: &mut usize) -> Self {
-        for (i, c) in s.chars().enumerate() {
+        let mut last_char_len = 0;
+        for (i, c) in s.char_indices() {
             if !(c.is_alphanumeric() || matches!(c, '_')) {
-                *counter += i - 1;
+                *counter += i - last_char_len;
                 return Self::Ident(&s[..i]);
             }
+            last_char_len = c.len_utf8();
         }
         *counter += s.len();
         Self::Ident(s)
@@ -196,5 +208,46 @@ mod tests {
                 Token::EOF
             ]
         );
+    }
+
+    #[test]
+    fn underscore() {
+        let text = "hello_world";
+        assert_eq!(
+            TokenStream::from_str(text).unwrap().inner,
+            vec![Token::Ident("hello_world"), Token::EOF]
+        )
+    }
+
+    #[test]
+    fn str_lit() {
+        let txt1 = "\"hello world\"";
+        assert_eq!(
+            TokenStream::from_str(txt1).unwrap().inner,
+            vec![Token::Lit("hello world"), Token::EOF]
+        );
+
+        let txt2 = "\'hello world\'";
+        assert_eq!(
+            TokenStream::from_str(txt2).unwrap().inner,
+            vec![Token::Lit("hello world"), Token::EOF]
+        );
+
+        let txt3 = "\"hello world\";";
+        assert_eq!(
+            TokenStream::from_str(txt3).unwrap().inner,
+            vec![Token::Lit("hello world"), Token::Semi, Token::EOF]
+        );
+
+        let txt4 = "print_str \"hello world\";";
+        assert_eq!(
+            TokenStream::from_str(txt4).unwrap().inner,
+            vec![
+                Token::Ident("print_str"),
+                Token::Lit("hello world"),
+                Token::Semi,
+                Token::EOF
+            ]
+        )
     }
 }
