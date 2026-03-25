@@ -68,7 +68,7 @@ impl<'a> Token<'a> {
 
     fn parse_single(s: &'a str, counter: &mut usize) -> Self {
         for (i, c) in s.chars().enumerate() {
-            if !(c.is_digit(10) || c.is_alphabetic()) {
+            if !(c.is_alphanumeric() || matches!(c, '_')) {
                 *counter += i - 1;
                 return Self::Ident(&s[..i]);
             }

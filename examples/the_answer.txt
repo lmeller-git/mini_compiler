@@ -1,0 +1,3 @@
+answer = 21;
+real_answer = answer + 84 / 4 - (10 - 10);
+print (real_answer + 42) / 2;
