@@ -4,7 +4,8 @@ A minimal example compiler
 
 ## Syntax
 
-declare a variable with:  
+declare a variable with:
+
 ```<var> = <expr>;```
 
 everything else are exprs
@@ -13,8 +14,18 @@ valid exprs use basic math operators and parentheses:
 
 ```(<var1> + <var2>) - (<var3> + <var4>);```
 
-print stuff with:  
+print stuff with:
+
 ```print <expr>;```
+
+## Quickstart
+
+Clone this repository and run:
+
+```bash
+ cargo run --release -- examples/the_answer.txt
+ ./examples/target/the_answer
+```
 
 ## Usage
 
