@@ -22,17 +22,17 @@ impl AsmWriter {
 
         writeln!(
             file,
-            "section .data\n\tformat_int: db \"%ld\", 10, 0\n\tformat_str: db \"%s\", 10, 0"
+            "section .data\n\tformat_int: db \"%ld\", 0\n\tformat_str: db \"%s\", 0"
         )
         .unwrap();
 
         for (payload, ident) in code.data.iter() {
-            writeln!(file, "\t{}: db \"{}\", 0", ident, payload.write_data()).unwrap();
+            writeln!(file, "\t{}: db `{}`, 0", ident, payload.write_data()).unwrap();
         }
 
         writeln!(
             file,
-            "section .text\n\tglobal main\n\textern printf\n\textern exit\n"
+            "\nsection .text\n\tglobal main\n\textern printf\n\textern exit\n"
         )
         .unwrap();
 
