@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Display};
 
-use crate::frontend::ast::{Ast, Expr, Line, Operation, Val};
+use crate::frontend::ast::{Ast, Expr, LValue, Line, Operation, Val};
 pub mod x86_64;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -44,7 +44,7 @@ pub enum CodeUnit {
         dest: Operand,
     },
     Assignment {
-        name: String,
+        name: LValue,
         value: Operand,
     },
 }
@@ -128,7 +128,7 @@ impl CodeBuilder {
                     };
                     let in_scope_temp = self.new_temp();
                     self.inner.units.push(CodeUnit::Operation {
-                        op: Operation::Load,
+                        op: Operation::AsRef,
                         lhs: Operand::Immediate(0), // random value. will be overwitten by load
                         rhs: Operand::Variable(temp_var),
                         dest: Operand::Temp(in_scope_temp.clone()),
@@ -183,7 +183,7 @@ mod tests {
                     dest: Operand::Temp("_temp_1".into()),
                 },
                 CodeUnit::Assignment {
-                    name: "x".into(),
+                    name: LValue::Variable("x".into()),
                     value: Operand::Temp("_temp_1".into()),
                 },
                 CodeUnit::Operation {
@@ -209,7 +209,7 @@ mod tests {
                     dest: Operand::Temp("_temp_4".into()),
                 },
                 CodeUnit::Assignment {
-                    name: "y".into(),
+                    name: LValue::Variable("y".into()),
                     value: Operand::Temp("_temp_4".into()),
                 },
                 CodeUnit::Operation {

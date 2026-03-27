@@ -9,10 +9,10 @@ pub enum Token<'a> {
     NEq,
     EqEq,
     Or,
-    And,
+    Ampercent,
     Add,
     Sub,
-    Mul,
+    Star,
     Div,
     Mod,
     OpenParen,
@@ -35,14 +35,14 @@ impl<'a> Token<'a> {
                     '\'' | '\"' => break 'outer Self::parse_quoted(&s2[i..], &mut n_parsed),
                     '+' => break 'outer Token::Add,
                     '-' => break 'outer Token::Sub,
-                    '*' => break 'outer Token::Mul,
+                    '*' => break 'outer Token::Star,
                     '/' => break 'outer Token::Div,
                     '%' => break 'outer Token::Mod,
                     '(' => break 'outer Token::OpenParen,
                     ')' => break 'outer Token::CloseParen,
                     ';' => break 'outer Token::Semi,
                     '|' => break 'outer Token::Or,
-                    '&' => break 'outer Token::And,
+                    '&' => break 'outer Token::Ampercent,
                     '=' => {
                         if s2.chars().nth(i + 1).is_some_and(|c| c == '=') {
                             n_parsed += 1;
@@ -202,7 +202,7 @@ mod tests {
                 Token::Add,
                 Token::Ident("2"),
                 Token::CloseParen,
-                Token::Mul,
+                Token::Star,
                 Token::Ident("5"),
                 Token::Semi,
                 Token::EOF

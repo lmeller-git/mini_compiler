@@ -1,0 +1,37 @@
+descriptor = "\nthe value is now: ";
+
+value = 42;
+
+value_ref = &value;
+
+print_str descriptor;
+print value;
+print_str "\nthe value ref points to: ";
+print *value_ref;
+
+*value_ref = *value_ref * 2;
+
+print_str descriptor;
+print value;
+
+value_ref_ref = &value_ref;
+**value_ref_ref = value - (*value_ref / 2);
+
+print_str descriptor;
+print **value_ref_ref;
+
+print_str descriptor;
+print value;
+
+
+descriptor_slice = descriptor + 19;
+
+value_tens = value / 10;
+value_ones = value - (value_tens * 10);
+
+char1 = value_tens + 48;
+char2 = value_ones + 48;
+
+*descriptor_slice = (10 * 65536) + (char2 * 256) + char1;
+
+print_str descriptor;

@@ -13,7 +13,12 @@ fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
             };
             lhs
         }
-        _ => return Err(AstErr::BadToken),
+        tok => {
+            let op = Operation::from_token_as_single(&tok)?;
+            stream.advance();
+            let rhs = parse_expr(stream, op.infix_power().0)?;
+            Expr::Op(Box::new(Expr::Val(Val::V(0))), op, Box::new(rhs))
+        }
     };
     loop {
         match stream.peek() {
@@ -66,13 +71,49 @@ impl Ast {
 
 pub enum Line {
     Expr(Expr),
-    Decl(String, Expr),
+    Decl(LValue, Expr),
     Call(String, Expr),
 }
 
 pub enum Expr {
     Val(Val),
     Op(Box<Expr>, Operation, Box<Expr>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LValue {
+    Variable(String),
+    Deref(Box<LValue>),
+}
+
+impl Display for LValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Variable(v) => write!(f, "{v}"),
+            Self::Deref(val) => write!(f, "*{}", *val),
+        }
+    }
+}
+
+impl LValue {
+    fn from_tokens(stream: &mut TokenStream) -> Result<Self, AstErr> {
+        match stream.peek() {
+            Token::Ident(i) => {
+                let Token::Eq = stream.peekn(1) else {
+                    return Err(AstErr::BadToken);
+                };
+                let ident = i.to_string();
+                _ = stream.advance();
+                Ok(Self::Variable(ident))
+            }
+            Token::Star => {
+                _ = stream.advance();
+                let inner = Self::from_tokens(stream)?;
+                Ok(Self::Deref(Box::new(inner)))
+            }
+            _ => Err(AstErr::BadToken),
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -83,20 +124,29 @@ pub enum Operation {
     Div,
     Mod,
     Load,
+    AsRef,
 }
 
 impl Operation {
     fn infix_power(&self) -> (f32, f32) {
         match self {
-            Self::Load => (3.1, 3.),
+            Self::Load | Self::AsRef => (3., 3.1),
             Self::Mul | Self::Div | Self::Mod => (2.1, 2.),
             Self::Sub | Self::Add => (1., 1.1),
         }
     }
 
+    fn from_token_as_single(token: &Token<'_>) -> Result<Self, AstErr> {
+        Ok(match token {
+            Token::Star => Self::Load,
+            Token::Ampercent => Self::AsRef,
+            _ => return Err(AstErr::BadToken),
+        })
+    }
+
     fn from_token(token: &Token<'_>) -> Result<Self, AstErr> {
         Ok(match token {
-            Token::Mul => Self::Mul,
+            Token::Star => Self::Mul,
             Token::Add => Self::Add,
             Token::Sub => Self::Sub,
             Token::Div => Self::Div,
@@ -127,17 +177,23 @@ impl Line {
                     stream.advance();
                     Ok(Self::Call(i, parse_expr(stream, 0.)?))
                 }
-                i => {
-                    if stream.peekn(1) == &Token::Eq {
-                        let i = i.to_string();
+                _i => {
+                    if let Ok(l) = LValue::from_tokens(stream) {
                         stream.advance();
-                        stream.advance();
-                        Ok(Self::Decl(i, parse_expr(stream, 0.)?))
+                        Ok(Self::Decl(l, parse_expr(stream, 0.)?))
                     } else {
                         Ok(Self::Expr(parse_expr(stream, 0.)?))
                     }
                 }
             },
+            Token::Star => {
+                if let Ok(l) = LValue::from_tokens(stream) {
+                    stream.advance();
+                    Ok(Self::Decl(l, parse_expr(stream, 0.)?))
+                } else {
+                    Ok(Self::Expr(parse_expr(stream, 0.)?))
+                }
+            }
             Token::EOF => return Err(AstErr::Eof),
             _ => Ok(Self::Expr(parse_expr(stream, 0.)?)),
         };
@@ -188,7 +244,8 @@ impl Display for Operation {
             Self::Add => write!(f, "+"),
             Self::Div => write!(f, "/"),
             Self::Mod => write!(f, "%"),
-            Self::Load => write!(f, "lea"),
+            Self::Load => write!(f, "*"),
+            Self::AsRef => write!(f, "&"),
         }
     }
 }

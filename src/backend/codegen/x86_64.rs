@@ -7,7 +7,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use crate::{frontend::ast::Operation, print_if};
+use crate::{backend::codegen::LValue, frontend::ast::Operation, print_if};
 
 use super::{CodeTree, CodeUnit, Operand};
 
@@ -98,12 +98,30 @@ impl AsmWriter {
                         }
                         _ => panic!("cannot assign to rvalue"),
                     };
-                    // self.write_in_fn(format_args!());
                 }
                 CodeUnit::Assignment { name, value } => {
-                    all_vars.add(name.clone());
-                    let reg = self.get_var_from_reg(value, &all_vars, &temps);
-                    self.write_in_fn(format_args!("mov qword [{}], {}", name, reg));
+                    let save_rcx = if let LValue::Variable(var_name) = name {
+                        all_vars.add(var_name.clone());
+                        true
+                    } else {
+                        false
+                    } && USAGE[Reg::RCX as usize].load(Ordering::Relaxed);
+
+                    let rhs = self.get_var_from_reg(value, &all_vars, &temps);
+                    self.write_in_fn(format_args!("mov rax, {}", rhs));
+
+                    if save_rcx {
+                        self.write_in_fn(format_args!("push rcx"));
+                        temps.inc_stack(8);
+                    }
+
+                    let resolved = self.resolve_lvalue(name);
+                    self.write_in_fn(format_args!("mov qword [{}], rax", resolved));
+
+                    if save_rcx {
+                        self.write_in_fn(format_args!("pop rcx"));
+                        temps.dec_stack(8);
+                    }
                 }
             }
         }
@@ -117,6 +135,18 @@ impl AsmWriter {
             "\nsection .note.GNU-stack noalloc noexec nowrite progbits"
         )
         .unwrap();
+    }
+
+    /// assume rcx unused
+    fn resolve_lvalue(&mut self, value: &LValue) -> String {
+        match value {
+            LValue::Variable(var) => var.clone(),
+            LValue::Deref(lvalue) => {
+                let inner = self.resolve_lvalue(lvalue);
+                self.write_in_fn(format_args!("mov rcx, [{}]", inner));
+                "rcx".into()
+            }
+        }
     }
 
     fn get_func_name<'a>(&self, name: &'a str) -> &'a str {
@@ -282,7 +312,36 @@ impl AsmWriter {
                 return;
             }
             Operation::Load => {
-                self.write_in_fn(format_args!("lea rax, [{}]", rhs));
+                let var_location = self.get_var_str(rhs, vars, temps);
+                // double deref, as var_location may be a ptr
+                self.write_in_fn(format_args!("mov rax, {}", var_location));
+                self.write_in_fn(format_args!("mov rax, [rax]"));
+                return;
+            }
+            Operation::AsRef => {
+                let addr = match rhs {
+                    Operand::Immediate(val) => {
+                        self.write_in_fn(format_args!("sub rsp, 8"));
+                        self.write_in_fn(format_args!("mov qword [rsp], {}", val));
+                        temps.inc_stack(8);
+                        "rsp"
+                    }
+                    Operand::Variable(var) => var,
+                    Operand::Temp(name) => {
+                        let Some(loc) = temps.get(name) else {
+                            panic!("temp referenced but not initialized: {}", name)
+                        };
+                        match loc {
+                            Location::Reg(reg) => {
+                                self.write_in_fn(format_args!("push {}", reg));
+                                temps.inc_stack(8);
+                                "rsp"
+                            }
+                            Location::Stack(s) => &format!("rsp + {}", s),
+                        }
+                    }
+                };
+                self.write_in_fn(format_args!("lea rax, [{}]", addr));
                 return;
             }
         };

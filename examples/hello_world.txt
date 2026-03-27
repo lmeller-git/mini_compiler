@@ -1,8 +1,2 @@
 hello_world = "hello world\n";
-
 print_str hello_world;
-
-world = hello_world + 5;
-
-print_str "hello";
-print_str world;
