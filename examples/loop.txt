@@ -4,9 +4,19 @@ x = 0;
 label print_hello;
 
 print_str hello_world;
+
+if x % 2; goto not_print_x;
 print_str "x == ";
 print x;
 print_str "\n";
+
+label not_print_x;
 x = x + 1;
 
-goto print_hello;
+label condition_def;
+cond = x - 40;
+
+label if_stmt;
+if cond; goto print_hello;
+
+print_str "exiting\n";

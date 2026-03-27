@@ -14,7 +14,7 @@ fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
             lhs
         }
         tok => {
-            let op = Operation::from_token_as_single(&tok)?;
+            let op = Operation::from_token_as_single(tok)?;
             stream.advance();
             let rhs = parse_expr(stream, op.infix_power().0)?;
             Expr::Op(Box::new(Expr::Val(Val::V(0))), op, Box::new(rhs))
@@ -75,6 +75,7 @@ pub enum Line {
     Expr(Expr),
     Decl(LValue, Expr),
     Call(String, Expr),
+    Cond(Expr, Box<Line>),
 }
 
 pub enum Expr {
@@ -196,6 +197,16 @@ impl Line {
                     Ok(Self::Expr(parse_expr(stream, 0.)?))
                 }
             }
+            Token::Keyword(kw) if matches!(kw, &"if") => {
+                stream.advance();
+                let cond = parse_expr(stream, 0.)?;
+                let Token::Semi = stream.next() else {
+                    return Err(AstErr::BadToken);
+                };
+
+                let then = Self::parse(stream)?;
+                return Ok(Self::Cond(cond, Box::new(then)));
+            }
             Token::EOF => return Err(AstErr::Eof),
             _ => Ok(Self::Expr(parse_expr(stream, 0.)?)),
         };
@@ -211,11 +222,11 @@ impl Val {
         Ok(match stream.next() {
             Token::Ident(t) => t
                 .parse::<i64>()
-                .map(|v| Self::V(v))
+                .map(Self::V)
                 .unwrap_or(Self::Var(t.to_string())),
             Token::Lit(t) => t
                 .parse::<i64>()
-                .map(|v| Self::V(v))
+                .map(Self::V)
                 .unwrap_or(Self::Lit(t.to_string())),
             _ => return Err(AstErr::BadToken),
         })
@@ -267,6 +278,7 @@ impl Display for Line {
             Self::Expr(e) => write!(f, "{}", e),
             Self::Decl(i, e) => write!(f, "declare {} = {}", i, e),
             Self::Call(i, e) => write!(f, "call {} {}", i, e),
+            Self::Cond(c, e) => write!(f, "if {}; {};", c, e),
         }
     }
 }

@@ -1,9 +1,12 @@
 use std::fmt::Display;
 
+static KEYWORDS: &[&str] = &["if"];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token<'a> {
     Ident(&'a str),
     Lit(&'a str),
+    Keyword(&'a str),
     Eq,
     Not,
     NEq,
@@ -81,12 +84,19 @@ impl<'a> Token<'a> {
         for (i, c) in s.char_indices() {
             if !(c.is_alphanumeric() || matches!(c, '_')) {
                 *counter += i - last_char_len;
-                return Self::Ident(&s[..i]);
+                return Self::Ident(&s[..i]).map_keyword();
             }
             last_char_len = c.len_utf8();
         }
         *counter += s.len();
-        Self::Ident(s)
+        Self::Ident(s).map_keyword()
+    }
+
+    fn map_keyword(self) -> Self {
+        match self {
+            Self::Ident(id) if KEYWORDS.contains(&id) => Self::Keyword(id),
+            _ => self,
+        }
     }
 }
 

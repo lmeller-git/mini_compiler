@@ -47,6 +47,11 @@ pub enum CodeUnit {
         name: LValue,
         value: Operand,
     },
+    Condition {
+        eval: Operand,
+        then: Vec<CodeUnit>,
+        label: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,25 +96,41 @@ impl CodeBuilder {
 
     pub fn build(mut self, ast: &Ast) -> CodeTree {
         for line in ast.lines() {
-            match line {
-                Line::Expr(e) => _ = self.lower_unit(e),
-                Line::Call(f, e) => {
-                    let arg = self.lower_unit(e);
-                    self.inner.units.push(CodeUnit::FuncCall {
-                        name: f.clone(),
-                        args: vec![arg],
-                    });
-                }
-                Line::Decl(v, e) => {
-                    let val = self.lower_unit(e);
-                    self.inner.units.push(CodeUnit::Assignment {
-                        name: v.clone(),
-                        value: val,
-                    });
-                }
-            }
+            self.lower_line(line);
         }
         self.inner
+    }
+
+    fn lower_line(&mut self, line: &Line) {
+        match line {
+            Line::Expr(e) => _ = self.lower_unit(e),
+            Line::Call(f, e) => {
+                let arg = self.lower_unit(e);
+                self.inner.units.push(CodeUnit::FuncCall {
+                    name: f.clone(),
+                    args: vec![arg],
+                });
+            }
+            Line::Decl(v, e) => {
+                let val = self.lower_unit(e);
+                self.inner.units.push(CodeUnit::Assignment {
+                    name: v.clone(),
+                    value: val,
+                });
+            }
+            Line::Cond(cond, then) => {
+                let cond = self.lower_unit(cond);
+                let label = self.new_temp();
+                let mut builder = CodeBuilder::new();
+                builder.lower_line(then);
+                self.inner.data.extend(builder.inner.data.drain());
+                self.inner.units.push(CodeUnit::Condition {
+                    eval: cond,
+                    then: builder.inner.units,
+                    label,
+                });
+            }
+        }
     }
 
     fn lower_unit(&mut self, expr: &Expr) -> Operand {

@@ -47,83 +47,7 @@ impl AsmWriter {
         let mut temps = TempVarStack::default();
 
         for unit in &code.units {
-            match unit {
-                CodeUnit::FuncCall { name, args } => {
-                    // for now assuming a single argument
-                    // TODO move temp in rdi also (mutate temps accordingly)
-                    // currently not necessary, as no native funcs exist
-
-                    let func_name = self.get_func_name(name);
-                    if self.is_builtin(func_name) {
-                        self.call_builtin(name, args, &all_vars, &mut temps);
-                    } else {
-                        if USAGE[Reg::RDI as usize].load(Ordering::Relaxed) {
-                            self.write_in_fn(format_args!("push rdi"));
-                            temps.inc_stack(8);
-                        }
-                        for op in args.iter() {
-                            //TODO mov in other regs depending on i
-                            self.write_in_fn(format_args!(
-                                "mov rdi, {}",
-                                self.get_var_str(op, &all_vars, &temps)
-                            ));
-                        }
-                        self.write_in_fn(format_args!("call {}", func_name));
-                        if USAGE[Reg::RDI as usize].load(Ordering::Relaxed) {
-                            self.write_in_fn(format_args!("pop rdi"));
-                            temps.dec_stack(8);
-                        }
-                    }
-                }
-                CodeUnit::Operation { op, lhs, rhs, dest } => {
-                    match dest {
-                        Operand::Variable(name) => {
-                            self.write_in_fn(format_args!(
-                                "mov rax, {}",
-                                self.get_var_str(lhs, &all_vars, &temps)
-                            ));
-                            self.write_op(op, rhs, &mut temps, &all_vars);
-
-                            self.write_in_fn(format_args!("mov qword [{}], rax", name));
-                        }
-                        Operand::Temp(name) => {
-                            self.write_in_fn(format_args!(
-                                "mov rax, {}",
-                                self.get_var_str(lhs, &all_vars, &temps)
-                            ));
-                            self.write_op(op, rhs, &mut temps, &all_vars);
-
-                            let addr = self.get_or_init_temp(name, &mut temps);
-                            self.write_in_fn(format_args!("mov {}, rax", addr));
-                        }
-                        _ => panic!("cannot assign to rvalue"),
-                    };
-                }
-                CodeUnit::Assignment { name, value } => {
-                    let save_rcx = if let LValue::Variable(var_name) = name {
-                        all_vars.add(var_name.clone());
-                        true
-                    } else {
-                        false
-                    } && USAGE[Reg::RCX as usize].load(Ordering::Relaxed);
-
-                    let rhs = self.get_var_from_reg(value, &all_vars, &temps);
-                    self.write_in_fn(format_args!("mov rax, {}", rhs));
-
-                    if save_rcx {
-                        self.write_in_fn(format_args!("push rcx"));
-                        temps.inc_stack(8);
-                    }
-
-                    let resolved = self.resolve_lvalue(name);
-                    self.write_in_fn(format_args!("mov qword [{}], rax", resolved));
-
-                    if save_rcx {
-                        self.write_in_fn(format_args!("pop rcx"));
-                        temps.dec_stack(8);
-                    }
-                }
-            }
+            self.write_unit(unit, &mut all_vars, &mut temps);
         }
 
         self.write_in_fn(format_args!("mov edi, 0"));
@@ -135,6 +59,95 @@ impl AsmWriter {
             "\nsection .note.GNU-stack noalloc noexec nowrite progbits"
         )
         .unwrap();
+    }
+
+    fn write_unit(&mut self, unit: &CodeUnit, all_vars: &mut Vars, temps: &mut TempVarStack) {
+        match unit {
+            CodeUnit::FuncCall { name, args } => {
+                // for now assuming a single argument
+                // TODO move temp in rdi also (mutate temps accordingly)
+                // currently not necessary, as no native funcs exist
+
+                let func_name = self.get_func_name(name);
+                if self.is_builtin(func_name) {
+                    self.call_builtin(name, args, all_vars, temps);
+                } else {
+                    if USAGE[Reg::RDI as usize].load(Ordering::Relaxed) {
+                        self.write_in_fn(format_args!("push rdi"));
+                        temps.inc_stack(8);
+                    }
+                    for op in args.iter() {
+                        //TODO mov in other regs depending on i
+                        self.write_in_fn(format_args!(
+                            "mov rdi, {}",
+                            self.get_var_str(op, all_vars, temps)
+                        ));
+                    }
+                    self.write_in_fn(format_args!("call {}", func_name));
+                    if USAGE[Reg::RDI as usize].load(Ordering::Relaxed) {
+                        self.write_in_fn(format_args!("pop rdi"));
+                        temps.dec_stack(8);
+                    }
+                }
+            }
+            CodeUnit::Operation { op, lhs, rhs, dest } => {
+                match dest {
+                    Operand::Variable(name) => {
+                        self.write_in_fn(format_args!(
+                            "mov rax, {}",
+                            self.get_var_str(lhs, all_vars, temps)
+                        ));
+                        self.write_op(op, rhs, temps, all_vars);
+
+                        self.write_in_fn(format_args!("mov qword [{}], rax", name));
+                    }
+                    Operand::Temp(name) => {
+                        self.write_in_fn(format_args!(
+                            "mov rax, {}",
+                            self.get_var_str(lhs, all_vars, temps)
+                        ));
+                        self.write_op(op, rhs, temps, all_vars);
+
+                        let addr = self.get_or_init_temp(name, temps);
+                        self.write_in_fn(format_args!("mov {}, rax", addr));
+                    }
+                    _ => panic!("cannot assign to rvalue"),
+                };
+            }
+            CodeUnit::Assignment { name, value } => {
+                let save_rcx = if let LValue::Variable(var_name) = name {
+                    all_vars.add(var_name.clone());
+                    true
+                } else {
+                    false
+                } && USAGE[Reg::RCX as usize].load(Ordering::Relaxed);
+
+                let rhs = self.get_var_from_reg(value, all_vars, temps);
+                self.write_in_fn(format_args!("mov rax, {}", rhs));
+
+                if save_rcx {
+                    self.write_in_fn(format_args!("push rcx"));
+                    temps.inc_stack(8);
+                }
+
+                let resolved = self.resolve_lvalue(name);
+                self.write_in_fn(format_args!("mov qword [{}], rax", resolved));
+
+                if save_rcx {
+                    self.write_in_fn(format_args!("pop rcx"));
+                    temps.dec_stack(8);
+                }
+            }
+            CodeUnit::Condition { eval, then, label } => {
+                let eval_position = self.get_var_from_reg(eval, all_vars, temps);
+                self.write_in_fn(format_args!("test {}, {}", eval_position, eval_position));
+                self.write_in_fn(format_args!("jz {}", label));
+                for unit in then {
+                    self.write_unit(unit, all_vars, temps);
+                }
+                writeln!(self.fh, "{}:", label).unwrap();
+            }
+        }
     }
 
     /// assume rcx unused
@@ -206,7 +219,8 @@ impl AsmWriter {
             self.write_in_fn(format_args!("push rdi"));
             temps.inc_stack(8);
         }
-        if !temps.stack_aligned() {
+        let needs_align = !temps.stack_aligned();
+        if needs_align {
             self.write_in_fn(format_args!("sub rsp, 8"));
             temps.inc_stack(8);
         }
@@ -223,6 +237,10 @@ impl AsmWriter {
         }
         if USAGE[Reg::RSI as usize].load(Ordering::Relaxed) {
             self.write_in_fn(format_args!("pop rsi"));
+            temps.dec_stack(8);
+        }
+        if needs_align {
+            self.write_in_fn(format_args!("add rsp, 8"));
             temps.dec_stack(8);
         }
     }
