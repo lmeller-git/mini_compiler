@@ -22,7 +22,7 @@ impl AsmWriter {
 
         writeln!(
             file,
-            "section .data\n\tformat_int: db \"%ld\", 0\n\tformat_str: db \"%s\", 0\ndefault rel"
+            "section .data\n\tformat_int: db \"%ld\", 0\n\tformat_str: db \"%s\", 0\n\tdefault rel"
         )
         .unwrap();
 
@@ -171,7 +171,7 @@ impl AsmWriter {
     }
 
     fn is_builtin(&self, name: &str) -> bool {
-        matches!(name, "printf" | "exit" | "goto" | "label")
+        matches!(name, "printf" | "exit" | "goto" | "label" | "sqrt")
     }
 
     fn call_builtin(
@@ -198,6 +198,32 @@ impl AsmWriter {
             }
             "goto" => self.write_in_fn(format_args!("jmp {}", args[0])),
             "label" => writeln!(self.fh, "{}:", args[0]).unwrap(),
+            "sqrt" => {
+                // assuming we get a ptr to some integer value
+                // result is written back to pointer
+                let rcx_usage = USAGE[Reg::RCX as usize].load(Ordering::Relaxed);
+                if rcx_usage {
+                    self.write_in_fn(format_args!("push rcx"));
+                    temps.inc_stack(8);
+                }
+
+                self.write_in_fn(format_args!(
+                    "mov rcx, {}",
+                    self.get_var_str(&args[0], vars, temps)
+                ));
+                self.write_in_fn(format_args!("mov rax, [rcx]"));
+
+                self.write_in_fn(format_args!("cvtsi2sd xmm0, rax"));
+                self.write_in_fn(format_args!("sqrtsd xmm0, xmm0"));
+                self.write_in_fn(format_args!("cvttsd2si rax, xmm0"));
+
+                self.write_in_fn(format_args!("mov [rcx], rax"));
+
+                if rcx_usage {
+                    self.write_in_fn(format_args!("pop rcx"));
+                    temps.dec_stack(8);
+                }
+            }
 
             _ => {}
         }

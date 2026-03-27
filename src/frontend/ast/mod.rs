@@ -47,6 +47,7 @@ fn is_func(ident: &str) -> bool {
         "print_str" => true,
         "label" => true,
         "goto" => true,
+        "sqrt" => true,
         _ => false,
     }
 }
