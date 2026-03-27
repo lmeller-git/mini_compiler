@@ -53,6 +53,7 @@ impl<'a> Token<'a> {
                     '&' => break 'outer Token::Ampercent,
                     '>' => {
                         if s2.chars().nth(i + 1).is_some_and(|c| c == '>') {
+                            n_parsed += 1;
                             break 'outer Token::Shr;
                         } else {
                             break 'outer Token::Gt;
@@ -60,6 +61,7 @@ impl<'a> Token<'a> {
                     }
                     '<' => {
                         if s2.chars().nth(i + 1).is_some_and(|c| c == '<') {
+                            n_parsed += 1;
                             break 'outer Token::Shl;
                         } else {
                             break 'outer Token::Lt;
