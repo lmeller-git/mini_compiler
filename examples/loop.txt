@@ -1,0 +1,12 @@
+hello_world = "hello world\n";
+x = 0;
+
+label print_hello;
+
+print_str hello_world;
+print_str "x == ";
+print x;
+print_str "\n";
+x = x + 1;
+
+goto print_hello;

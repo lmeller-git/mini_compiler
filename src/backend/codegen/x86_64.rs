@@ -158,7 +158,7 @@ impl AsmWriter {
     }
 
     fn is_builtin(&self, name: &str) -> bool {
-        matches!(name, "printf" | "exit")
+        matches!(name, "printf" | "exit" | "goto" | "label")
     }
 
     fn call_builtin(
@@ -183,6 +183,9 @@ impl AsmWriter {
                 self.write_in_fn(format_args!("mov edi, 0"));
                 self.write_in_fn(format_args!("call exit"));
             }
+            "goto" => self.write_in_fn(format_args!("jmp {}", args[0])),
+            "label" => writeln!(self.fh, "{}:", args[0]).unwrap(),
+
             _ => {}
         }
     }

@@ -43,6 +43,8 @@ fn is_func(ident: &str) -> bool {
     match ident {
         "print" => true,
         "print_str" => true,
+        "label" => true,
+        "goto" => true,
         _ => false,
     }
 }

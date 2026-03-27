@@ -26,7 +26,7 @@ pub enum DataUnit {
 impl DataUnit {
     pub fn write_data(&self) -> &str {
         match self {
-            Self::StrLit(lit) => &lit,
+            Self::StrLit(lit) => lit,
         }
     }
 }
