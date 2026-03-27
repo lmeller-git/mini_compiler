@@ -52,6 +52,7 @@ pub enum CodeUnit {
         then: Vec<CodeUnit>,
         label: String,
     },
+    Cleanup,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,6 +98,7 @@ impl CodeBuilder {
     pub fn build(mut self, ast: &Ast) -> CodeTree {
         for line in ast.lines() {
             self.lower_line(line);
+            self.inner.units.push(CodeUnit::Cleanup);
         }
         self.inner
     }

@@ -46,8 +46,29 @@ impl AsmWriter {
         let mut all_vars = Vars::default();
         let mut temps = TempVarStack::default();
 
+        let stack_size_at_last_cleanup = temps.stack_pushes;
+
         for unit in &code.units {
             self.write_unit(unit, &mut all_vars, &mut temps);
+
+            if let CodeUnit::Cleanup = unit {
+                let leaked_bytes = temps.stack_pushes - stack_size_at_last_cleanup;
+                if leaked_bytes > 0 {
+                    print_if!(
+                        4,
+                        "memory leak of {} bytes detected in {:?}, cleaning up",
+                        leaked_bytes,
+                        unit
+                    );
+                    self.write_in_fn(format_args!("add rsp, {}", leaked_bytes));
+                }
+
+                temps.stack_pushes = stack_size_at_last_cleanup;
+                temps.inner.clear();
+                for usage in USAGE.iter() {
+                    usage.store(false, Ordering::Relaxed);
+                }
+            }
         }
 
         self.write_in_fn(format_args!("mov edi, 0"));
@@ -147,6 +168,7 @@ impl AsmWriter {
                 }
                 writeln!(self.fh, "{}:", label).unwrap();
             }
+            CodeUnit::Cleanup => {}
         }
     }
 
