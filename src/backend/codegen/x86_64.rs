@@ -311,6 +311,54 @@ impl AsmWriter {
             Operation::Mul => "imul",
             Operation::Sub => "sub",
             Operation::Add => "add",
+            Operation::BitAND => "and",
+            Operation::BitOR => "or",
+            Operation::BitXOR => "xor",
+            Operation::Not => {
+                // ignore lhs
+                self.write_in_fn(format_args!(
+                    "mov rax, {}",
+                    self.get_var_str(rhs, vars, temps)
+                ));
+                self.write_in_fn(format_args!("test rax, rax"));
+                self.write_in_fn(format_args!("sete al"));
+                self.write_in_fn(format_args!("movzx rax, al"));
+                return;
+            }
+            Operation::Gt => {
+                self.write_in_fn(format_args!(
+                    "cmp rax, {}",
+                    self.get_var_str(rhs, vars, temps)
+                ));
+                self.write_in_fn(format_args!("setg al"));
+                self.write_in_fn(format_args!("movzx rax, al"));
+                return;
+            }
+            Operation::Lt => {
+                self.write_in_fn(format_args!(
+                    "cmp rax, {}",
+                    self.get_var_str(rhs, vars, temps)
+                ));
+                self.write_in_fn(format_args!("setl al"));
+                self.write_in_fn(format_args!("movzx rax, al"));
+                return;
+            }
+            Operation::EqEq => {
+                self.write_in_fn(format_args!(
+                    "cmp rax, {}",
+                    self.get_var_str(rhs, vars, temps)
+                ));
+                self.write_in_fn(format_args!("sete al"));
+                self.write_in_fn(format_args!("movzx rax, al"));
+                return;
+            }
+            Operation::Load => {
+                let var_location = self.get_var_str(rhs, vars, temps);
+                // double deref, as var_location may be a ptr
+                self.write_in_fn(format_args!("mov rax, {}", var_location));
+                self.write_in_fn(format_args!("mov rax, [rax]"));
+                return;
+            }
             Operation::Div | Operation::Mod => {
                 // sign extend RDX:RAX
                 self.write_in_fn(format_args!("cqo"));
@@ -332,11 +380,42 @@ impl AsmWriter {
                 }
                 return;
             }
-            Operation::Load => {
-                let var_location = self.get_var_str(rhs, vars, temps);
-                // double deref, as var_location may be a ptr
-                self.write_in_fn(format_args!("mov rax, {}", var_location));
-                self.write_in_fn(format_args!("mov rax, [rax]"));
+            Operation::Shr => {
+                let rcx_usage = USAGE[Reg::RCX as usize].load(Ordering::Relaxed);
+                if rcx_usage {
+                    self.write_in_fn(format_args!("push rcx"));
+                    temps.inc_stack(8);
+                }
+
+                self.write_in_fn(format_args!(
+                    "mov rcx, {}",
+                    self.get_var_str(rhs, vars, temps)
+                ));
+                self.write_in_fn(format_args!("shr rax, cl"));
+
+                if rcx_usage {
+                    self.write_in_fn(format_args!("pop rcx"));
+                    temps.dec_stack(8);
+                }
+                return;
+            }
+            Operation::Shl => {
+                let rcx_usage = USAGE[Reg::RCX as usize].load(Ordering::Relaxed);
+                if rcx_usage {
+                    self.write_in_fn(format_args!("push rcx"));
+                    temps.inc_stack(8);
+                }
+
+                self.write_in_fn(format_args!(
+                    "mov rcx, {}",
+                    self.get_var_str(rhs, vars, temps)
+                ));
+                self.write_in_fn(format_args!("shl rax, cl"));
+
+                if rcx_usage {
+                    self.write_in_fn(format_args!("pop rcx"));
+                    temps.dec_stack(8);
+                }
                 return;
             }
             Operation::AsRef => {

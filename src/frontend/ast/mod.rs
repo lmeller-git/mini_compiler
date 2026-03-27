@@ -128,14 +128,29 @@ pub enum Operation {
     Mod,
     Load,
     AsRef,
+    Not,
+    Gt,
+    Lt,
+    EqEq,
+    BitAND,
+    BitOR,
+    BitXOR,
+    Shr,
+    Shl,
 }
 
 impl Operation {
     fn infix_power(&self) -> (f32, f32) {
         match self {
-            Self::Load | Self::AsRef => (3., 3.1),
-            Self::Mul | Self::Div | Self::Mod => (2.1, 2.),
-            Self::Sub | Self::Add => (1., 1.1),
+            Self::Load | Self::AsRef => (4., 4.1),
+            Self::Not => (3.5, 3.6),
+            Self::Mul | Self::Div | Self::Mod => (3., 3.1),
+            Self::Sub | Self::Add => (2., 2.1),
+            Self::Shr | Self::Shl => (1.8, 1.9),
+            Self::BitAND => (1.6, 1.7),
+            Self::BitXOR => (1.5, 1.6),
+            Self::BitOR => (1.4, 1.5),
+            Self::Gt | Self::Lt | Self::EqEq => (1., 1.1),
         }
     }
 
@@ -143,6 +158,7 @@ impl Operation {
         Ok(match token {
             Token::Star => Self::Load,
             Token::Ampercent => Self::AsRef,
+            Token::Not => Self::Not,
             _ => return Err(AstErr::BadToken),
         })
     }
@@ -154,6 +170,15 @@ impl Operation {
             Token::Sub => Self::Sub,
             Token::Div => Self::Div,
             Token::Mod => Self::Mod,
+            Token::Ampercent => Self::BitAND,
+            Token::Or => Self::BitOR,
+            Token::Hat => Self::BitXOR,
+            Token::Shr => Self::Shr,
+            Token::Shl => Self::Shl,
+            Token::Not => Self::Not,
+            Token::Gt => Self::Gt,
+            Token::Lt => Self::Lt,
+            Token::EqEq => Self::EqEq,
             _ => return Err(AstErr::BadToken),
         })
     }
@@ -259,6 +284,15 @@ impl Display for Operation {
             Self::Mod => write!(f, "%"),
             Self::Load => write!(f, "*"),
             Self::AsRef => write!(f, "&"),
+            Self::Not => write!(f, "!"),
+            Self::Gt => write!(f, ">"),
+            Self::Lt => write!(f, "<"),
+            Self::EqEq => write!(f, "=="),
+            Self::BitAND => write!(f, "&"),
+            Self::BitOR => write!(f, "|"),
+            Self::BitXOR => write!(f, "^"),
+            Self::Shr => write!(f, ">>"),
+            Self::Shl => write!(f, "<<"),
         }
     }
 }

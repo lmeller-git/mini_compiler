@@ -21,6 +21,11 @@ pub enum Token<'a> {
     OpenParen,
     CloseParen,
     Semi,
+    Gt,
+    Lt,
+    Hat,
+    Shr,
+    Shl,
     EOF,
 }
 
@@ -46,6 +51,21 @@ impl<'a> Token<'a> {
                     ';' => break 'outer Token::Semi,
                     '|' => break 'outer Token::Or,
                     '&' => break 'outer Token::Ampercent,
+                    '>' => {
+                        if s2.chars().nth(i + 1).is_some_and(|c| c == '>') {
+                            break 'outer Token::Shr;
+                        } else {
+                            break 'outer Token::Gt;
+                        }
+                    }
+                    '<' => {
+                        if s2.chars().nth(i + 1).is_some_and(|c| c == '<') {
+                            break 'outer Token::Shl;
+                        } else {
+                            break 'outer Token::Lt;
+                        }
+                    }
+                    '^' => break 'outer Token::Hat,
                     '=' => {
                         if s2.chars().nth(i + 1).is_some_and(|c| c == '=') {
                             n_parsed += 1;
