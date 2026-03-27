@@ -44,7 +44,7 @@ impl AsmWriter {
         // ensure stack is 16-byte aligned. It is currently misaligned due to the C-runtime calling main
         self.write_in_fn(format_args!("sub rsp, 8"));
         let mut all_vars = Vars::default();
-        let mut temps = TempVarTrack::default();
+        let mut temps = TempVarStack::default();
 
         for unit in &code.units {
             match unit {
@@ -166,7 +166,7 @@ impl AsmWriter {
         name: &str,
         args: &[Operand],
         vars: &Vars,
-        temps: &mut TempVarTrack,
+        temps: &mut TempVarStack,
     ) {
         match name {
             "print" => {
@@ -191,7 +191,7 @@ impl AsmWriter {
         &mut self,
         args: &[Operand],
         vars: &Vars,
-        temps: &mut TempVarTrack,
+        temps: &mut TempVarStack,
         formatter: &str,
     ) {
         // TODO should also modify temps accordingly
@@ -224,7 +224,7 @@ impl AsmWriter {
         }
     }
 
-    fn get_or_init_temp(&mut self, k: &str, temps: &mut TempVarTrack) -> String {
+    fn get_or_init_temp(&mut self, k: &str, temps: &mut TempVarStack) -> String {
         let loc = if let Some(loc) = temps.get(k) {
             loc
         } else {
@@ -245,7 +245,7 @@ impl AsmWriter {
         }
     }
 
-    fn get_var_str(&self, v: &Operand, _vars: &Vars, temps: &TempVarTrack) -> String {
+    fn get_var_str(&self, v: &Operand, _vars: &Vars, temps: &TempVarStack) -> String {
         match v {
             Operand::Immediate(val) => format!("{}", val),
             Operand::Variable(name) => format!("[{}]", name),
@@ -261,7 +261,7 @@ impl AsmWriter {
         }
     }
 
-    fn get_var_from_reg(&mut self, v: &Operand, _vars: &Vars, temps: &TempVarTrack) -> String {
+    fn get_var_from_reg(&mut self, v: &Operand, _vars: &Vars, temps: &TempVarStack) -> String {
         // assuming rax is usable
         match v {
             Operand::Immediate(val) => format!("{}", val),
@@ -284,7 +284,7 @@ impl AsmWriter {
         }
     }
 
-    fn write_op(&mut self, op: &Operation, rhs: &Operand, temps: &mut TempVarTrack, vars: &Vars) {
+    fn write_op(&mut self, op: &Operation, rhs: &Operand, temps: &mut TempVarStack, vars: &Vars) {
         // assuming lhs is in rax, leaves res in rax
         let op_str = match op {
             Operation::Mul => "imul",
@@ -362,12 +362,12 @@ impl AsmWriter {
 }
 
 #[derive(Default, Debug)]
-struct TempVarTrack {
+struct TempVarStack {
     inner: HashMap<String, Location>,
     stack_pushes: usize,
 }
 
-impl TempVarTrack {
+impl TempVarStack {
     fn inc_stack(&mut self, increase: usize) {
         self.stack_pushes += increase;
         for loc in self.inner.values_mut() {
