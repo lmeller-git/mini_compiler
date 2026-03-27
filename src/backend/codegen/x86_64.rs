@@ -22,7 +22,7 @@ impl AsmWriter {
 
         writeln!(
             file,
-            "section .data\n\tformat_int: db \"%ld\", 0\n\tformat_str: db \"%s\", 0"
+            "section .data\n\tformat_int: db \"%ld\", 0\n\tformat_str: db \"%s\", 0\ndefault rel"
         )
         .unwrap();
 
