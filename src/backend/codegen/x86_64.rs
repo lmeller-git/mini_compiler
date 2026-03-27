@@ -266,6 +266,7 @@ impl AsmWriter {
         }
     }
 
+    /// returns the location of the operand
     fn get_var_str(&self, v: &Operand, _vars: &Vars, temps: &TempVarStack) -> String {
         match v {
             Operand::Immediate(val) => format!("{}", val),
@@ -282,10 +283,14 @@ impl AsmWriter {
         }
     }
 
+    /// returns the location of the operand. This location will be a register
     fn get_var_from_reg(&mut self, v: &Operand, _vars: &Vars, temps: &TempVarStack) -> String {
         // assuming rax is usable
         match v {
-            Operand::Immediate(val) => format!("{}", val),
+            Operand::Immediate(val) => {
+                self.write_in_fn(format_args!("mov rax, {}", val));
+                "rax".to_string()
+            }
             Operand::Variable(name) => {
                 self.write_in_fn(format_args!("mov rax, qword [{}]", name));
                 "rax".to_string()

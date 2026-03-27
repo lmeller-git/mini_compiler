@@ -1,2 +1,7 @@
-hello_world = "hello world\n";
-print_str hello_world;
+# This is a comment
+
+hello_world = "hello world\n"; # This is a string
+
+print_str hello_world; # This prints a string
+
+if 1; if !0; print_str "this is an if\n";

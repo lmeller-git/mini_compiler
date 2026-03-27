@@ -37,9 +37,19 @@ impl<'a> Token<'a> {
         }
         let mut n_parsed = 0;
         let token = 'outer: loop {
-            for (i, c) in s2.char_indices() {
+            let mut idc = s2.char_indices();
+            'inner: while let Some((i, c)) = idc.next() {
                 n_parsed += c.len_utf8();
                 match c {
+                    '#' => {
+                        while let Some((_, c)) = idc.next() {
+                            n_parsed += c.len_utf8();
+                            if c == '\n' {
+                                continue 'inner;
+                            }
+                        }
+                        break 'outer Token::EOF;
+                    }
                     '\'' | '\"' => break 'outer Self::parse_quoted(&s2[i..], &mut n_parsed),
                     '+' => break 'outer Token::Add,
                     '-' => break 'outer Token::Sub,

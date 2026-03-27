@@ -122,7 +122,9 @@ impl CodeBuilder {
                 let cond = self.lower_unit(cond);
                 let label = self.new_temp();
                 let mut builder = CodeBuilder::new();
+                builder.temp_name = self.temp_name;
                 builder.lower_line(then);
+                self.temp_name = builder.temp_name;
                 self.inner.data.extend(builder.inner.data.drain());
                 self.inner.units.push(CodeUnit::Condition {
                     eval: cond,
