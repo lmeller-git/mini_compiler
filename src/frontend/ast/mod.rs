@@ -9,7 +9,7 @@ fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
             stream.advance();
             let lhs = parse_expr(stream, 0.)?;
             let Token::CloseParen = stream.next() else {
-                return Err(AstErr::BadToken);
+                return Err(AstErr::BadToken(stream.peek().to_string()));
             };
             lhs
         }
@@ -23,7 +23,9 @@ fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
     loop {
         match stream.peek() {
             Token::EOF | Token::CloseParen | Token::Semi => break,
-            Token::Ident(_) | Token::Lit(_) => return Err(AstErr::BadToken),
+            Token::Ident(_) | Token::Lit(_) => {
+                return Err(AstErr::BadToken(stream.peek().to_string()));
+            }
             tok => {
                 let op = Operation::from_token(tok)?;
                 let (r, l) = op.infix_power();
@@ -103,7 +105,7 @@ impl LValue {
         match stream.peek() {
             Token::Ident(i) => {
                 let Token::Eq = stream.peekn(1) else {
-                    return Err(AstErr::BadToken);
+                    return Err(AstErr::BadToken(stream.peekn(1).to_string()));
                 };
                 let ident = i.to_string();
                 _ = stream.advance();
@@ -114,7 +116,7 @@ impl LValue {
                 let inner = Self::from_tokens(stream)?;
                 Ok(Self::Deref(Box::new(inner)))
             }
-            _ => Err(AstErr::BadToken),
+            tok => Err(AstErr::BadToken(tok.to_string())),
         }
     }
 }
@@ -159,7 +161,7 @@ impl Operation {
             Token::Star => Self::Load,
             Token::Ampercent => Self::AsRef,
             Token::Not => Self::Not,
-            _ => return Err(AstErr::BadToken),
+            tok => return Err(AstErr::BadToken(tok.to_string())),
         })
     }
 
@@ -179,7 +181,7 @@ impl Operation {
             Token::Gt => Self::Gt,
             Token::Lt => Self::Lt,
             Token::EqEq => Self::EqEq,
-            _ => return Err(AstErr::BadToken),
+            tok => return Err(AstErr::BadToken(tok.to_string())),
         })
     }
 }
@@ -192,7 +194,7 @@ pub enum Val {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AstErr {
-    BadToken,
+    BadToken(String),
     Eof,
 }
 
@@ -225,8 +227,9 @@ impl Line {
             Token::Keyword(kw) if matches!(kw, &"if") => {
                 stream.advance();
                 let cond = parse_expr(stream, 0.)?;
-                let Token::Semi = stream.next() else {
-                    return Err(AstErr::BadToken);
+                let _semi = stream.next();
+                let Token::Semi = _semi else {
+                    return Err(AstErr::BadToken(_semi.to_string()));
                 };
 
                 let then = Self::parse(stream)?;
@@ -235,8 +238,9 @@ impl Line {
             Token::EOF => return Err(AstErr::Eof),
             _ => Ok(Self::Expr(parse_expr(stream, 0.)?)),
         };
-        let Token::Semi = stream.next() else {
-            return Err(AstErr::BadToken);
+        let _semi = stream.next();
+        let Token::Semi = _semi else {
+            return Err(AstErr::BadToken(_semi.to_string()));
         };
         r
     }
@@ -253,7 +257,7 @@ impl Val {
                 .parse::<i64>()
                 .map(Self::V)
                 .unwrap_or(Self::Lit(t.to_string())),
-            _ => return Err(AstErr::BadToken),
+            tok => return Err(AstErr::BadToken(tok.to_string())),
         })
     }
 }
