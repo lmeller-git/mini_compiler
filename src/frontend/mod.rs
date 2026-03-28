@@ -1,4 +1,3 @@
-use crate::Ordering;
 use ast::Ast;
 use lexer::{LexErr, TokenStream};
 
