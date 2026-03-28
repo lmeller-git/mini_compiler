@@ -55,6 +55,17 @@ Valid exprs use basic math operators, parentheses, strlits and pointer derefs/re
 ```(<var1> + <var2>) - (<var3> + <var4>);```
 
 
+## Builtin functions
+
+The current supported builtin functions are
+
+- print
+- print_str
+- exit
+- label
+- goto
+- sqrt
+
 ## Supported targets
 
 Currently only x86_64 linux is supported.
