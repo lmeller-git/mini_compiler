@@ -2,5 +2,5 @@ answer = 21;
 real_answer = answer + 84 / 4 - (10 - 10);
 
 print_str "The answer is: ";
-print (real_answer + 42) / 2;
+print (*&real_answer + 42) / 2;
 print_str "\n";
