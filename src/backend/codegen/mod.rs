@@ -91,10 +91,6 @@ impl CodeBuilder {
         name
     }
 
-    fn current_temp(&self) -> String {
-        format!("_temp_{}", self.temp_name)
-    }
-
     pub fn build(mut self, ast: &Ast) -> CodeTree {
         for line in ast.lines() {
             self.lower_line(line);

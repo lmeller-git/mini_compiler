@@ -7,7 +7,7 @@ pub mod ast;
 mod lexer;
 
 pub fn get_ast(s: &str) -> Result<Ast, FrontendErr> {
-    let mut token_stream = TokenStream::from_str(s).map_err(|e| FrontendErr::Lex(e))?;
+    let mut token_stream = TokenStream::from_str(s).map_err(FrontendErr::Lex)?;
     print_if!(2, "stream: {}", token_stream);
     Ok(Ast::from_stream(&mut token_stream))
 }

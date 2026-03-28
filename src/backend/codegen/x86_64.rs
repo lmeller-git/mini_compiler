@@ -7,7 +7,11 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use crate::{backend::codegen::LValue, frontend::ast::Operation, print_if};
+use crate::{
+    backend::codegen::LValue,
+    frontend::ast::{Operation, is_builtin_func},
+    print_if,
+};
 
 use super::{CodeTree, CodeUnit, Operand};
 
@@ -90,7 +94,7 @@ impl AsmWriter {
                 // currently not necessary, as no native funcs exist
 
                 let func_name = self.get_func_name(name);
-                if self.is_builtin(func_name) {
+                if is_builtin_func(func_name) {
                     self.call_builtin(name, args, all_vars, temps);
                 } else {
                     if USAGE[Reg::RDI as usize].load(Ordering::Relaxed) {
@@ -190,10 +194,6 @@ impl AsmWriter {
             "print_str" => "printf",
             _ => name,
         }
-    }
-
-    fn is_builtin(&self, name: &str) -> bool {
-        matches!(name, "printf" | "exit" | "goto" | "label" | "sqrt")
     }
 
     fn call_builtin(
@@ -508,10 +508,6 @@ impl AsmWriter {
     fn write_in_fn(&mut self, line: Arguments) {
         writeln!(self.fh, "\t{}", line).unwrap()
     }
-
-    fn write_default_funcs(&mut self) {
-        todo!()
-    }
 }
 
 #[derive(Default, Debug)]
@@ -566,6 +562,7 @@ impl TempVarStack {
         self.inner.get(k)
     }
 
+    #[allow(unused)]
     fn drop(&mut self, k: &str) {
         if let Some(Location::Reg(r)) = self.inner.remove(k) {
             USAGE[r as usize].store(false, Ordering::Relaxed);
@@ -574,12 +571,12 @@ impl TempVarStack {
 
     fn stack_aligned(&self) -> bool {
         // assuming rel stack == 0 is aligned
-        self.stack_pushes % 16 == 0
+        self.stack_pushes.is_multiple_of(16)
     }
 }
 
 // rax + rdx are used for calculations
-#[allow(clippy::upper_case_acronyms)]
+#[allow(clippy::upper_case_acronyms, unused)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(usize)]
 enum Reg {

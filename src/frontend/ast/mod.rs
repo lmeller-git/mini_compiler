@@ -41,15 +41,8 @@ fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
     Ok(lhs)
 }
 
-fn is_func(ident: &str) -> bool {
-    match ident {
-        "print" => true,
-        "print_str" => true,
-        "label" => true,
-        "goto" => true,
-        "sqrt" => true,
-        _ => false,
-    }
+pub(crate) fn is_builtin_func(ident: &str) -> bool {
+    matches!(ident, "printf" | "exit" | "goto" | "label" | "sqrt")
 }
 
 pub struct Ast {
@@ -109,11 +102,11 @@ impl LValue {
                     return Err(AstErr::BadToken(stream.peekn(1).to_string()));
                 };
                 let ident = i.to_string();
-                _ = stream.advance();
+                stream.advance();
                 Ok(Self::Variable(ident))
             }
             Token::Star => {
-                _ = stream.advance();
+                stream.advance();
                 let inner = Self::from_tokens(stream)?;
                 Ok(Self::Deref(Box::new(inner)))
             }
@@ -203,7 +196,7 @@ impl Line {
     fn parse(stream: &mut TokenStream) -> Result<Self, AstErr> {
         let r = match stream.peek() {
             Token::Ident(i) => match i {
-                i if is_func(i) => {
+                i if is_builtin_func(i) => {
                     let i = i.to_string();
                     stream.advance();
                     Ok(Self::Call(i, parse_expr(stream, 0.)?))

@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 static KEYWORDS: &[&str] = &["if"];
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token<'a> {
     Ident(&'a str),
@@ -36,13 +37,13 @@ impl<'a> Token<'a> {
             return Ok((Self::EOF, 0));
         }
         let mut n_parsed = 0;
-        let token = 'outer: loop {
+        let token = 'outer: {
             let mut idc = s2.char_indices();
             'inner: while let Some((i, c)) = idc.next() {
                 n_parsed += c.len_utf8();
                 match c {
                     '#' => {
-                        while let Some((_, c)) = idc.next() {
+                        for (_, c) in idc.by_ref() {
                             n_parsed += c.len_utf8();
                             if c == '\n' {
                                 continue 'inner;
@@ -166,8 +167,7 @@ impl<'a> TokenStream<'a> {
     }
 
     pub fn peekn(&self, n: usize) -> &Token<'_> {
-        &self
-            .inner
+        self.inner
             .get((self.cursor + n).min(self.inner.len()))
             .unwrap_or(&Token::EOF)
     }

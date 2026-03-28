@@ -56,7 +56,7 @@ fn main() {
     print_if!(
         1,
         "generating {0}.o from {0}.asm",
-        dir.join(format!("{}", f_name)).display()
+        dir.join(f_name).display()
     );
 
     assemble(&dir.join(format!("{}.asm", f_name)), f_name);
