@@ -1,17 +1,13 @@
-#![allow(dead_code)]
 use std::{
     fs::{File, create_dir},
     io::{ErrorKind, Read},
     path::{Path, PathBuf},
     process::Command,
-    sync::atomic::{AtomicU8, Ordering},
+    sync::atomic::Ordering,
 };
 
 use clap::Parser;
-use frontend::get_ast;
-
-mod backend;
-pub mod frontend;
+use mini_compiler::{VERBOSITY, backend, frontend::get_ast, print_if};
 
 #[derive(clap::Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -20,8 +16,6 @@ struct ParserImpl {
     #[arg(short, long, default_value_t = 1)]
     verbosity: u8,
 }
-
-pub static VERBOSITY: AtomicU8 = AtomicU8::new(0);
 
 fn main() {
     let args = ParserImpl::parse();
@@ -108,18 +102,4 @@ fn link_with_gcc(f: &Path, f_name: &str) {
         .status()
         .expect("failed to run gcc");
     assert!(status.success(), "gcc failed");
-}
-
-#[macro_export]
-macro_rules! print_if {
-    ($min_verbosity:expr) => {
-        if $crate::VERBOSITY.load(Ordering::Relaxed) > $min_verbosity {
-            println!();
-        }
-    };
-    ($min_verbosity:expr, $($arg:tt)*) => {
-        if $crate::VERBOSITY.load(Ordering::Relaxed) > $min_verbosity {
-            println!("{}", format_args!($($arg)*))
-        }
-    };
 }
