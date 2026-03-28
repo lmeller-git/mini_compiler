@@ -28,12 +28,12 @@ fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
             }
             tok => {
                 let op = Operation::from_token(tok)?;
-                let (r, l) = op.infix_power();
-                if l < min_bp {
+                let (l, r) = op.infix_power();
+                if r < min_bp {
                     break;
                 }
                 stream.advance();
-                let rhs = parse_expr(stream, r)?;
+                let rhs = parse_expr(stream, l)?;
                 lhs = Expr::Op(Box::new(lhs), op, Box::new(rhs));
             }
         }
@@ -147,7 +147,7 @@ impl Operation {
         match self {
             Self::Load | Self::AsRef => (4., 4.1),
             Self::Not => (3.5, 3.6),
-            Self::Mul | Self::Div | Self::Mod => (3., 3.1),
+            Self::Mul | Self::Div | Self::Mod => (3.1, 3.),
             Self::Sub | Self::Add => (2., 2.1),
             Self::Shr | Self::Shl => (1.8, 1.9),
             Self::BitAND => (1.6, 1.7),

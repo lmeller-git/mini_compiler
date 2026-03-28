@@ -211,6 +211,7 @@ mod tests {
                     name: LValue::Variable("x".into()),
                     value: Operand::Temp("_temp_1".into()),
                 },
+                CodeUnit::Cleanup,
                 CodeUnit::Operation {
                     op: Operation::Add,
                     lhs: Operand::Variable("x".into()),
@@ -221,6 +222,7 @@ mod tests {
                     name: "print".into(),
                     args: vec![Operand::Temp("_temp_2".into())],
                 },
+                CodeUnit::Cleanup,
                 CodeUnit::Operation {
                     op: Operation::Sub,
                     lhs: Operand::Immediate(5),
@@ -237,12 +239,14 @@ mod tests {
                     name: LValue::Variable("y".into()),
                     value: Operand::Temp("_temp_4".into()),
                 },
+                CodeUnit::Cleanup,
                 CodeUnit::Operation {
                     op: Operation::Add,
                     lhs: Operand::Variable("x".into()),
                     rhs: Operand::Immediate(2),
                     dest: Operand::Temp("_temp_5".into()),
                 },
+                CodeUnit::Cleanup,
             ],
         };
 
