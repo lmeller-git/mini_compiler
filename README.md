@@ -8,8 +8,8 @@ A minimal example compiler
 Clone this repository and run:
 
 ```bash
- cargo run --release -- examples/hello_world.txt
- ./examples/target/hello_world
+ cargo run --release -- examples/hello_world.lang
+ ./target/a.out
 ```
 
 
@@ -17,11 +17,19 @@ Clone this repository and run:
 
 write your code into some file, then call
 
-```cargo run --release -- <file>```
+```bash
+cargo run --release -- <file>
+```
 
-this will create `target/` in the parent of your file and fill it with `<file_name>.asm`, `<file_name>.o` and `<file_name>`.
+this will create `target/` in your wd and fill it with `<file_name>.asm`, `<file_name>.o` and `a.out`.
 
-To run the binary simply call `target/<file_name>`
+To run the binary simply call `target/a.out`
+
+For more options refer to
+
+```bash
+cargo run --release -- --help
+```
 
 ## Syntax
 
@@ -35,6 +43,12 @@ Define a function with:
 begin_def <ident> [ <ident> ( ',' <ident> )* ] ;
  <line>*
 end_def
+```
+
+Referance an external function with:
+
+```
+ extern_def <ident> [ <ident> ( ',' <ident> )* ] ;
 ```
 
 Call a function with:
