@@ -1,6 +1,6 @@
 use std::{
-    fs::{File, create_dir},
-    io::{ErrorKind, Read},
+    fs::{self, File},
+    io::Read,
     path::{Path, PathBuf},
     process::Command,
     sync::atomic::Ordering,
@@ -9,10 +9,20 @@ use std::{
 use clap::Parser;
 use mini_compiler::{VERBOSITY, backend, frontend::get_ast, print_if};
 
+const EXT: &str = "lang";
+
 #[derive(clap::Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct ParserImpl {
-    file: PathBuf,
+    #[arg(required = true)]
+    inputs: Vec<PathBuf>,
+
+    #[arg(short, long, default_value = "a.out")]
+    output: String,
+
+    #[arg(short, long, default_value = "./target")]
+    target: String,
+
     #[arg(short, long, default_value_t = 1)]
     verbosity: u8,
 }
@@ -20,86 +30,122 @@ struct ParserImpl {
 fn main() {
     let args = ParserImpl::parse();
     VERBOSITY.store(args.verbosity, Ordering::Relaxed);
-    let mut contents = File::open(&args.file).unwrap();
-    let mut s = String::new();
-    contents.read_to_string(&mut s).unwrap();
-    let ast = get_ast(&s).unwrap();
 
-    print_if!(2, "{}", ast);
-
-    let mut dir = args.file.parent().unwrap_or(Path::new(".")).to_path_buf();
-    dir.push("target");
-
-    print_if!(1, "generating code in {}", dir.display());
-
-    let f_name = args
-        .file
-        .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .split(".")
-        .next()
-        .unwrap();
-
-    match create_dir(&dir) {
-        Ok(_) => {}
-        Err(e) if e.kind() == ErrorKind::AlreadyExists => {}
-        e => panic!("could not create target/, {:#?}", e),
+    let mut files = Vec::new();
+    for path in &args.inputs {
+        if path.is_dir() {
+            files.extend(recursive_collect(path));
+        } else if path.is_file() {
+            // ignore EXT for manually added files
+            files.push(path.clone());
+        } else {
+            panic!("Input file not found: {}", path.display());
+        }
     }
-    let code = backend::generate(&ast).unwrap();
 
-    print_if!(2, "{:#?}", code);
+    if files.is_empty() {
+        println!("No files to compile");
+        return;
+    }
 
-    _ = backend::asm_gen(code, &dir.join(format!("{}.asm", f_name)));
+    let target_dir = PathBuf::from(args.target);
+    if let Err(e) = fs::create_dir_all(&target_dir) {
+        panic!(
+            "could not create target directory {}, {:#?}",
+            target_dir.display(),
+            e
+        );
+    }
 
+    let mut obj_files = Vec::new();
+
+    print_if!(1, "compiling {} files...", files.len());
+
+    for file in &files {
+        let f_name = file.file_stem().unwrap().to_str().unwrap();
+        print_if!(1, "Compiling {}", file.display());
+
+        let mut s = String::new();
+        File::open(file).unwrap().read_to_string(&mut s).unwrap();
+
+        let ast = get_ast(&s).unwrap();
+        print_if!(2, "AST for {}: {}", f_name, ast);
+
+        let code = backend::generate(&ast).unwrap();
+        print_if!(2, "IR for {}: {:#?}", f_name, code);
+
+        let asm_path = target_dir.join(format!("{}.asm", f_name));
+        let obj_path = target_dir.join(format!("{}.o", f_name));
+
+        backend::asm_gen(code, &asm_path).unwrap();
+
+        print_if!(
+            1,
+            "Assembling {} to {}",
+            asm_path.display(),
+            obj_path.display()
+        );
+        assemble(&asm_path, &obj_path);
+
+        obj_files.push(obj_path);
+    }
+
+    let final_binary = target_dir.join(&args.output);
     print_if!(
         1,
-        "generating {0}.o from {0}.asm",
-        dir.join(f_name).display()
+        "Linking {} objects into {}",
+        obj_files.len(),
+        final_binary.display()
     );
 
-    assemble(&dir.join(format!("{}.asm", f_name)), f_name);
+    link_with_gcc(&obj_files, &final_binary);
 
-    print_if!(
-        1,
-        "{} succesfully generated",
-        dir.join(format!("{}.o", f_name)).display()
-    );
-
-    link_with_gcc(&dir.join(format!("{}.o", f_name)), f_name);
-
-    print_if!(
-        0,
-        "code succesfully generated in {}/{}",
-        dir.display(),
-        f_name
-    );
+    print_if!(0, "Compiled files into: {}", final_binary.display());
 }
 
-fn assemble(f: &Path, f_name: &str) {
+fn assemble(asm_path: &Path, obj_path: &Path) {
     let status = Command::new("nasm")
         .args([
             "-f",
             "elf64",
-            f.to_str().unwrap(),
+            asm_path.to_str().unwrap(),
             "-o",
-            &format!("{}/{}.o", f.parent().unwrap().display(), f_name),
+            obj_path.to_str().unwrap(),
         ])
         .status()
         .expect("failed to run nasm");
-    assert!(status.success(), "nasm failed");
+    assert!(status.success(), "nasm failed for {}", asm_path.display());
 }
 
-fn link_with_gcc(f: &Path, f_name: &str) {
+fn link_with_gcc(obj_files: &[PathBuf], out_path: &Path) {
+    let mut args = vec!["-no-pie".to_string()];
+
+    for obj in obj_files {
+        args.push(obj.to_str().unwrap().to_string());
+    }
+
+    args.push("-o".to_string());
+    args.push(out_path.to_str().unwrap().to_string());
+
     let status = Command::new("gcc")
-        .args([
-            "-no-pie",
-            f.to_str().unwrap(),
-            "-o",
-            &format!("{}/{}", f.parent().unwrap().display(), f_name),
-        ])
+        .args(&args)
         .status()
         .expect("failed to run gcc");
-    assert!(status.success(), "gcc failed");
+    assert!(status.success(), "gcc linking failed");
+}
+
+fn recursive_collect(dir: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_file() && p.extension().and_then(|s| s.to_str()) == Some(EXT) {
+                files.push(p);
+            } else if p.is_dir() {
+                files.extend(recursive_collect(&p));
+            }
+        }
+    }
+
+    files
 }

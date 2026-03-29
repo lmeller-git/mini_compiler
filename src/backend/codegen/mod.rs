@@ -8,31 +8,55 @@ pub mod x86_64;
 #[derive(Debug)]
 pub struct ProgramIR {
     pub functions: indexmap::IndexMap<String, FunctionIR>,
+    pub external: indexmap::IndexMap<String, FunctionIR>,
 }
 
 impl ProgramIR {
     pub fn build(ast: &Ast) -> Self {
-        let mut functions = IndexMap::with_capacity(ast.funcs().count());
+        let mut functions = IndexMap::new();
+        let mut external = IndexMap::new();
         let mut builder = CodeBuilder::new();
         for func in ast.funcs() {
-            functions.insert(
-                func.name.clone(),
-                FunctionIR {
-                    body: builder.build(func.body.iter(), func.name.clone()),
-                    name: func.name.clone(),
-                    args: func
-                        .args
-                        .clone()
-                        .into_iter()
-                        .map(|mut arg| {
-                            builder.rename_ident(&mut arg);
-                            arg
-                        })
-                        .collect(),
-                },
-            );
+            if let Some(func_body) = func.body() {
+                functions.insert(
+                    func.name.clone(),
+                    FunctionIR {
+                        body: builder.build(func_body, func.name.clone()),
+                        name: func.name.clone(),
+                        args: func
+                            .args
+                            .clone()
+                            .into_iter()
+                            .map(|mut arg| {
+                                builder.rename_ident(&mut arg);
+                                arg
+                            })
+                            .collect(),
+                    },
+                );
+            } else {
+                external.insert_full(
+                    func.name.clone(),
+                    FunctionIR {
+                        name: func.name.clone(),
+                        args: func
+                            .args
+                            .clone()
+                            .into_iter()
+                            .map(|mut arg| {
+                                builder.rename_ident(&mut arg);
+                                arg
+                            })
+                            .collect(),
+                        body: CodeTree::default(),
+                    },
+                );
+            }
         }
-        Self { functions }
+        Self {
+            functions,
+            external,
+        }
     }
 }
 
@@ -253,7 +277,8 @@ mod tests {
             end_def
         ";
         let ast = get_ast(s).unwrap();
-        let code = CodeBuilder::new().build(ast.funcs().next().unwrap().body.iter(), "main".into());
+        let code =
+            CodeBuilder::new().build(ast.funcs().next().unwrap().body().unwrap(), "main".into());
         let code_true = CodeTree {
             data: HashMap::new(),
             units: vec![

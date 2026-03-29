@@ -1,5 +1,7 @@
 # This is a comment
 
+extern_def hey input;
+
 begin_def hello input1, input2;
 	print_str input1;
 	print_str input2;

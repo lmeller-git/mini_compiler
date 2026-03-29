@@ -4,6 +4,37 @@ use indexmap::IndexMap;
 
 use super::lexer::{Token, TokenStream};
 
+macro_rules! parse_list {
+    (
+        $stream:expr,
+        $end_tok:pat,
+        $sep_tok:pat,
+        $item_pat:pat => $extract:expr
+    ) => {{
+        let mut items = Vec::new();
+
+        loop {
+            let peeked = $stream.peek();
+
+            if matches!(*peeked, $end_tok) {
+                break;
+            }
+            let $item_pat = peeked else {
+                return Err(AstErr::BadToken(peeked.to_string()));
+            };
+
+            items.push($extract);
+            $stream.advance();
+
+            if matches!(*$stream.peek(), $sep_tok) {
+                $stream.advance();
+            }
+        }
+        $stream.advance();
+        items
+    }};
+}
+
 fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
     let mut lhs = match stream.peek() {
         Token::Ident(_) | Token::Lit(_) => Expr::Val(Val::parse(stream)?),
@@ -81,16 +112,20 @@ impl Ast {
 
 pub struct Function {
     pub name: String,
-    pub body: Vec<Line>,
+    pub body: Option<Vec<Line>>,
     pub args: Vec<String>,
 }
 
 impl Function {
     fn parse(funcs: &IndexMap<String, Function>, stream: &mut TokenStream) -> Result<Self, AstErr> {
-        let _kw = stream.peek();
-        let Token::Keyword("begin_def") = _kw else {
-            return Err(AstErr::BadToken(_kw.to_string()));
+        let kw = stream.peek();
+
+        let has_body = match kw {
+            Token::Keyword("extern_def") => false,
+            Token::Keyword("begin_def") => true,
+            _ => return Err(AstErr::BadToken(kw.to_string())),
         };
+
         stream.advance();
 
         let ident = stream.peek();
@@ -100,34 +135,32 @@ impl Function {
         let name = ident.to_string();
         stream.advance();
 
-        let mut args = Vec::new();
+        let args = parse_list!(stream, Token::Semi, Token::Comma, Token::Ident(ident) => ident.to_string());
 
-        while *stream.peek() != Token::Semi {
-            let arg = stream.peek();
-            let Token::Ident(ident) = arg else {
-                return Err(AstErr::BadToken(arg.to_string()));
-            };
-            args.push(ident.to_string());
-            stream.advance();
-            if let Token::Comma = stream.peek() {
-                stream.advance();
+        if has_body {
+            let mut body = Vec::new();
+
+            while *stream.peek() != Token::Keyword("end_def") {
+                body.push(Line::parse(funcs, stream)?);
             }
+            stream.advance();
+
+            Ok(Self {
+                name,
+                body: Some(body),
+                args,
+            })
+        } else {
+            Ok(Self {
+                name,
+                body: None,
+                args,
+            })
         }
-        stream.advance();
-
-        let mut body = Vec::new();
-
-        while *stream.peek() != Token::Keyword("end_def") {
-            body.push(Line::parse(funcs, stream)?);
-        }
-        println!("hieruwgowiuge");
-        stream.advance();
-
-        Ok(Self { name, body, args })
     }
 
-    fn body(&self) -> impl Iterator<Item = &Line> {
-        self.body.iter()
+    pub fn body(&self) -> Option<impl Iterator<Item = &Line>> {
+        self.body.as_ref().map(|b| b.iter())
     }
 }
 
@@ -338,8 +371,10 @@ impl Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "fn {}(", self.name)?;
         writeln!(f, "{}) {{", self.args.join(","))?;
-        for line in self.body() {
-            writeln!(f, "{};", line)?;
+        if let Some(body) = self.body() {
+            for line in body {
+                writeln!(f, "{};", line)?;
+            }
         }
         write!(f, "}}")
     }

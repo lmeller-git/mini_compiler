@@ -34,11 +34,14 @@ impl AsmWriter {
             writeln!(file, "\t{}: db `{}`, 0", ident, payload.write_data()).unwrap();
         }
 
-        writeln!(
-            file,
-            "\nsection .text\n\tglobal main\n\textern printf\n\textern exit\n"
-        )
-        .unwrap();
+        writeln!(file, "\nsection .text\n\textern printf\n\textern exit").unwrap();
+        for extern_func in code.external.keys() {
+            writeln!(file, "\textern {}", extern_func).unwrap();
+        }
+        for local_func in code.functions.keys() {
+            writeln!(file, "\tglobal {}", local_func).unwrap();
+        }
+        writeln!(file).unwrap();
 
         Self { fh: file }
     }
