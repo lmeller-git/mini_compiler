@@ -1,8 +1,8 @@
 use std::path::Path;
 
-use codegen::{CodeBuilder, CodeTree, x86_64::AsmWriter};
+use codegen::x86_64::AsmWriter;
 
-use crate::frontend::ast::Ast;
+use crate::{backend::codegen::ProgramIR, frontend::ast::Ast};
 
 mod codegen;
 
@@ -13,11 +13,11 @@ mod codegen;
 // provide some global func for all funcs that are called ->
 // prepare registers -> call
 
-pub fn generate(ast: &Ast) -> Result<CodeTree, BackendErr> {
-    Ok(CodeBuilder::new().build(ast))
+pub fn generate(ast: &Ast) -> Result<ProgramIR, BackendErr> {
+    Ok(ProgramIR::build(ast))
 }
 
-pub fn asm_gen(code: CodeTree, name: &Path) -> Result<(), BackendErr> {
+pub fn asm_gen(code: ProgramIR, name: &Path) -> Result<(), BackendErr> {
     AsmWriter::new(name, &code).write(&code);
     Ok(())
 }

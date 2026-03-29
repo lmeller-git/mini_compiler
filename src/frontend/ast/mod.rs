@@ -1,5 +1,7 @@
 use std::fmt::{Debug, Display};
 
+use indexmap::IndexMap;
+
 use super::lexer::{Token, TokenStream};
 
 fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
@@ -22,7 +24,7 @@ fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
     };
     loop {
         match stream.peek() {
-            Token::EOF | Token::CloseParen | Token::Semi => break,
+            Token::EOF | Token::CloseParen | Token::Semi | Token::Comma => break,
             Token::Ident(_) | Token::Lit(_) => {
                 return Err(AstErr::BadToken(stream.peek().to_string()));
             }
@@ -41,6 +43,10 @@ fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
     Ok(lhs)
 }
 
+pub(crate) fn is_func(funcs: &IndexMap<String, Function>, ident: &str) -> bool {
+    funcs.contains_key(ident) || is_builtin_func(ident)
+}
+
 pub(crate) fn is_builtin_func(ident: &str) -> bool {
     matches!(
         ident,
@@ -49,31 +55,86 @@ pub(crate) fn is_builtin_func(ident: &str) -> bool {
 }
 
 pub struct Ast {
-    inner: Vec<Line>,
+    functions: IndexMap<String, Function>,
 }
 
 impl Ast {
     pub fn from_stream(s: &mut TokenStream) -> Self {
-        let mut inner = Vec::new();
+        let mut functions = IndexMap::new();
         loop {
-            match Line::parse(s) {
-                Ok(l) => inner.push(l),
+            match Function::parse(&functions, s) {
+                Ok(func) => _ = functions.insert(func.name.clone(), func),
                 Err(AstErr::Eof) => break,
                 Err(e) => panic!("err in parse: {:#?}", e),
             }
+            if *s.peek() == Token::EOF {
+                break;
+            }
         }
-        Self { inner }
+        Self { functions }
     }
 
-    pub fn lines(&self) -> impl Iterator<Item = &Line> {
-        self.inner.iter()
+    pub fn funcs(&self) -> impl Iterator<Item = &Function> {
+        self.functions.values()
+    }
+}
+
+pub struct Function {
+    pub name: String,
+    pub body: Vec<Line>,
+    pub args: Vec<String>,
+}
+
+impl Function {
+    fn parse(funcs: &IndexMap<String, Function>, stream: &mut TokenStream) -> Result<Self, AstErr> {
+        let _kw = stream.peek();
+        let Token::Keyword("begin_def") = _kw else {
+            return Err(AstErr::BadToken(_kw.to_string()));
+        };
+        stream.advance();
+
+        let ident = stream.peek();
+        let Token::Ident(ident) = ident else {
+            return Err(AstErr::BadToken(ident.to_string()));
+        };
+        let name = ident.to_string();
+        stream.advance();
+
+        let mut args = Vec::new();
+
+        while *stream.peek() != Token::Semi {
+            let arg = stream.peek();
+            let Token::Ident(ident) = arg else {
+                return Err(AstErr::BadToken(arg.to_string()));
+            };
+            args.push(ident.to_string());
+            stream.advance();
+            if let Token::Comma = stream.peek() {
+                stream.advance();
+            }
+        }
+        stream.advance();
+
+        let mut body = Vec::new();
+
+        while *stream.peek() != Token::Keyword("end_def") {
+            body.push(Line::parse(funcs, stream)?);
+        }
+        println!("hieruwgowiuge");
+        stream.advance();
+
+        Ok(Self { name, body, args })
+    }
+
+    fn body(&self) -> impl Iterator<Item = &Line> {
+        self.body.iter()
     }
 }
 
 pub enum Line {
     Expr(Expr),
     Decl(LValue, Expr),
-    Call(String, Expr),
+    Call(String, Vec<Expr>),
     Cond(Expr, Box<Line>),
 }
 
@@ -183,6 +244,7 @@ impl Operation {
     }
 }
 
+#[derive(Clone)]
 pub enum Val {
     Var(String),
     V(i64),
@@ -196,13 +258,20 @@ pub enum AstErr {
 }
 
 impl Line {
-    fn parse(stream: &mut TokenStream) -> Result<Self, AstErr> {
+    fn parse(funcs: &IndexMap<String, Function>, stream: &mut TokenStream) -> Result<Self, AstErr> {
         let r = match stream.peek() {
             Token::Ident(i) => match i {
-                i if is_builtin_func(i) => {
+                i if is_func(funcs, i) => {
                     let i = i.to_string();
                     stream.advance();
-                    Ok(Self::Call(i, parse_expr(stream, 0.)?))
+                    let mut exprs = Vec::new();
+                    while *stream.peek() != Token::Semi {
+                        exprs.push(parse_expr(stream, 0.)?);
+                        if let Token::Comma = stream.peek() {
+                            stream.advance();
+                        }
+                    }
+                    Ok(Self::Call(i, exprs))
                 }
                 _i => {
                     if let Ok(l) = LValue::from_tokens(stream) {
@@ -229,7 +298,7 @@ impl Line {
                     return Err(AstErr::BadToken(_semi.to_string()));
                 };
 
-                let then = Self::parse(stream)?;
+                let then = Self::parse(funcs, stream)?;
                 return Ok(Self::Cond(cond, Box::new(then)));
             }
             Token::EOF => return Err(AstErr::Eof),
@@ -262,6 +331,17 @@ impl Val {
 impl Debug for Line {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self)
+    }
+}
+
+impl Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "fn {}(", self.name)?;
+        writeln!(f, "{}) {{", self.args.join(","))?;
+        for line in self.body() {
+            writeln!(f, "{};", line)?;
+        }
+        write!(f, "}}")
     }
 }
 
@@ -312,15 +392,23 @@ impl Display for Line {
         match self {
             Self::Expr(e) => write!(f, "{}", e),
             Self::Decl(i, e) => write!(f, "declare {} = {}", i, e),
-            Self::Call(i, e) => write!(f, "call {} {}", i, e),
-            Self::Cond(c, e) => write!(f, "if {}; {};", c, e),
+            Self::Call(i, e) => write!(
+                f,
+                "call {} {}",
+                i,
+                e.iter()
+                    .map(|ele| ele.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
+            Self::Cond(c, e) => write!(f, "if {}; {}", c, e),
         }
     }
 }
 
 impl Display for Ast {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for e in &self.inner {
+        for e in self.funcs() {
             writeln!(f, "{};", e)?;
         }
         Ok(())
@@ -334,16 +422,18 @@ mod tests {
     #[test]
     fn ast() {
         let s = "
+            begin_def main;
           x = 1+ 2;
           print x * (5+2);
           y = x / (3 + 2);
           x + y / 5 * 4;
+          end_def
         ";
         let mut stream = TokenStream::from_str(s).unwrap();
         let ast = Ast::from_stream(&mut stream);
         assert_eq!(
             format!("{}", ast),
-            "declare x = (1 + 2);\ncall print (x * (5 + 2));\ndeclare y = (x / (3 + 2));\n(x + ((y / 5) * 4));\n"
+            "fn main() {\ndeclare x = (1 + 2);\ncall print (x * (5 + 2));\ndeclare y = (x / (3 + 2));\n(x + ((y / 5) * 4));\n};\n"
         )
     }
 }

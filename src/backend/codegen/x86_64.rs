@@ -8,19 +8,19 @@ use std::{
 };
 
 use crate::{
-    backend::codegen::LValue,
+    backend::codegen::{LValue, ProgramIR},
     frontend::ast::{Operation, is_builtin_func},
     print_if,
 };
 
-use super::{CodeTree, CodeUnit, Operand};
+use super::{CodeUnit, Operand};
 
 pub struct AsmWriter {
     fh: File,
 }
 
 impl AsmWriter {
-    pub fn new(path: &Path, code: &CodeTree) -> Self {
+    pub fn new(path: &Path, code: &ProgramIR) -> Self {
         let mut file = File::create(path).unwrap();
         print_if!(1, "writing asm code to {}", path.display());
 
@@ -30,7 +30,7 @@ impl AsmWriter {
         )
         .unwrap();
 
-        for (payload, ident) in code.data.iter() {
+        for (payload, ident) in code.functions.values().flat_map(|f| f.body.data.iter()) {
             writeln!(file, "\t{}: db `{}`, 0", ident, payload.write_data()).unwrap();
         }
 
@@ -43,40 +43,54 @@ impl AsmWriter {
         Self { fh: file }
     }
 
-    pub fn write(mut self, code: &CodeTree) {
-        writeln!(self.fh, "main:").unwrap();
-        // ensure stack is 16-byte aligned. It is currently misaligned due to the C-runtime calling main
-        self.write_in_fn(format_args!("sub rsp, 8"));
+    pub fn write(mut self, code: &ProgramIR) {
         let mut all_vars = Vars::default();
         let mut temps = TempVarStack::default();
+        for (name, func) in code.functions.iter() {
+            let stack_size_at_last_cleanup = temps.stack_pushes; // 0
 
-        let stack_size_at_last_cleanup = temps.stack_pushes;
+            writeln!(self.fh, "{}:", name).unwrap();
+            for (arg, reg) in func.args.iter().zip(CALL_ORDER) {
+                all_vars.add(arg.clone());
+                self.write_in_fn(format_args!("mov qword [{}], {}", arg, reg));
+            }
 
-        for unit in &code.units {
-            self.write_unit(unit, &mut all_vars, &mut temps);
+            // restore satck alignment, which is currently off due to call of function
+            self.write_in_fn(format_args!("sub rsp, 8"));
 
-            if let CodeUnit::Cleanup = unit {
-                let leaked_bytes = temps.stack_pushes - stack_size_at_last_cleanup;
-                if leaked_bytes > 0 {
-                    print_if!(
-                        4,
-                        "memory leak of {} bytes detected in {:?}, cleaning up",
-                        leaked_bytes,
-                        unit
-                    );
-                    self.write_in_fn(format_args!("add rsp, {}", leaked_bytes));
-                }
+            for unit in &func.body.units {
+                self.write_unit(unit, &mut all_vars, &mut temps);
 
-                temps.stack_pushes = stack_size_at_last_cleanup;
-                temps.inner.clear();
-                for usage in USAGE.iter() {
-                    usage.store(false, Ordering::Relaxed);
+                if let CodeUnit::Cleanup = unit {
+                    let leaked_bytes = temps.stack_pushes - stack_size_at_last_cleanup;
+                    if leaked_bytes > 0 {
+                        print_if!(
+                            4,
+                            "memory leak of {} bytes detected in {:?}, cleaning up",
+                            leaked_bytes,
+                            unit
+                        );
+                        self.write_in_fn(format_args!("add rsp, {}", leaked_bytes));
+                    }
+
+                    temps.stack_pushes = stack_size_at_last_cleanup;
+                    temps.inner.clear();
+                    for usage in USAGE.iter() {
+                        usage.store(false, Ordering::Relaxed);
+                    }
                 }
             }
-        }
 
-        self.write_in_fn(format_args!("mov edi, 0"));
-        self.write_in_fn(format_args!("call exit"));
+            // if we are in main inject call to exit, to properly kill the process
+            if func.name == "main" {
+                self.write_in_fn(format_args!("mov edi, 0"));
+                self.write_in_fn(format_args!("call exit"));
+            } else {
+                // add back the previously substracted 8 bytes for return
+                self.write_in_fn(format_args!("add rsp, 8"));
+                self.write_in_fn(format_args!("ret"));
+            }
+        }
 
         write!(self.fh, "\nsection .bss\n{}", all_vars).unwrap();
         write!(
@@ -89,29 +103,33 @@ impl AsmWriter {
     fn write_unit(&mut self, unit: &CodeUnit, all_vars: &mut Vars, temps: &mut TempVarStack) {
         match unit {
             CodeUnit::FuncCall { name, args } => {
-                // for now assuming a single argument
-                // TODO move temp in rdi also (mutate temps accordingly)
-                // currently not necessary, as no native funcs exist
-
                 let func_name = self.get_func_name(name);
-                if is_builtin_func(func_name) {
+                if is_builtin_func(name) {
                     self.call_builtin(name, args, all_vars, temps);
                 } else {
-                    if USAGE[Reg::RDI as usize].load(Ordering::Relaxed) {
-                        self.write_in_fn(format_args!("push rdi"));
-                        temps.inc_stack(8);
+                    if args.len() > 6 {
+                        panic!("currently only call via register supported. Use 6 or less args");
                     }
-                    for op in args.iter() {
-                        //TODO mov in other regs depending on i
+
+                    let mut saved_regs = Vec::new();
+                    for (op, reg) in args.iter().zip(CALL_ORDER) {
+                        if USAGE[reg as usize].load(Ordering::Relaxed) {
+                            self.write_in_fn(format_args!("push {}", reg));
+                            saved_regs.push(reg);
+                            temps.inc_stack(8);
+                        }
                         self.write_in_fn(format_args!(
-                            "mov rdi, {}",
+                            "mov {}, {}",
+                            reg,
                             self.get_var_str(op, all_vars, temps)
                         ));
                     }
+
                     self.write_in_fn(format_args!("call {}", func_name));
-                    if USAGE[Reg::RDI as usize].load(Ordering::Relaxed) {
-                        self.write_in_fn(format_args!("pop rdi"));
-                        temps.dec_stack(8);
+
+                    temps.dec_stack(8 * saved_regs.len());
+                    for reg in saved_regs.into_iter().rev() {
+                        self.write_in_fn(format_args!("pop {}", reg));
                     }
                 }
             }
@@ -619,6 +637,8 @@ const REGS: [Reg; 7] = [
     Reg::RSI,
     Reg::RCX,
 ];
+
+const CALL_ORDER: [Reg; 6] = [Reg::RDI, Reg::RSI, Reg::RDX, Reg::RCX, Reg::R8, Reg::R9];
 
 static USAGE: [AtomicBool; 7] = [const { AtomicBool::new(false) }; 7];
 

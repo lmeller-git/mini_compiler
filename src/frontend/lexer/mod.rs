@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-static KEYWORDS: &[&str] = &["if"];
+static KEYWORDS: &[&str] = &["if", "begin_def", "end_def"];
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,6 +27,7 @@ pub enum Token<'a> {
     Hat,
     Shr,
     Shl,
+    Comma,
     EOF,
 }
 
@@ -62,6 +63,7 @@ impl<'a> Token<'a> {
                     ';' => break 'outer Token::Semi,
                     '|' => break 'outer Token::Or,
                     '&' => break 'outer Token::Ampercent,
+                    ',' => break 'outer Token::Comma,
                     '>' => {
                         if s2.chars().nth(i + 1).is_some_and(|c| c == '>') {
                             n_parsed += 1;

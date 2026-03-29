@@ -1,7 +1,15 @@
 # This is a comment
 
-hello_world = "hello world\n"; # This is a string
+begin_def hello input1, input2;
+	print_str input1;
+	print_str input2;
+end_def
 
-print_str hello_world; # This prints a string
+begin_def main;
+	hello_world = "hello world\n"; # This is a string
 
-if 1; if !0; print_str "this is an if\n";
+	print_str hello_world; # This prints a string
+	hello hello_world, "from func hello\n";
+
+	if 1; if !0; print_str "this is an if\n";
+end_def

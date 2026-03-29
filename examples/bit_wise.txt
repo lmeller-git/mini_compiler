@@ -1,42 +1,44 @@
-print_str "--- Testing Bitwise & Logic ---\n";
+begin_def main;
+	print_str "--- Testing Bitwise & Logic ---\n";
 
-counter = 0;
-limit = 6;
+	counter = 0;
+	limit = 6;
 
-label loop_start;
+	label loop_start;
 
-is_done = counter == limit;
-if is_done; goto loop_end;
+	is_done = counter == limit;
+	if is_done; goto loop_end;
 
-power = 1 << counter;
+	power = 1 << counter;
 
-print_str "2^";
-print counter;
-print_str " = ";
-print power;
-print_str "\n";
+	print_str "2^";
+	print counter;
+	print_str " = ";
+	print power;
+	print_str "\n";
 
-is_odd = counter & 1;
+	is_odd = counter & 1;
 
-if is_odd; goto print_odd;
-print_str " (counter is even) | ";
-goto skip_odd;
+	if is_odd; goto print_odd;
+	print_str " (counter is even) | ";
+	goto skip_odd;
 
-label print_odd;
-print_str " (counter is odd)  | ";
+	label print_odd;
+	print_str " (counter is odd)  | ";
 
-label skip_odd;
+	label skip_odd;
 
-scrambled = power ^ 255;
-scrambled = scrambled | 256;
-scrambled = scrambled >> 2;
+	scrambled = power ^ 255;
+	scrambled = scrambled | 256;
+	scrambled = scrambled >> 2;
 
-print_str "Scrambled: ";
-print scrambled;
-print_str "\n";
+	print_str "Scrambled: ";
+	print scrambled;
+	print_str "\n";
 
-counter = counter + 1;
-if counter < limit; goto loop_start;
+	counter = counter + 1;
+	if counter < limit; goto loop_start;
 
-label loop_end;
-print_str "Bitwise logic test complete!\n";
+	label loop_end;
+	print_str "Bitwise logic test complete!\n";
+end_def

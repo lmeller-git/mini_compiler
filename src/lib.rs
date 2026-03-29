@@ -2,7 +2,6 @@ use std::sync::atomic::AtomicU8;
 
 pub mod backend;
 pub mod frontend;
-
 pub static VERBOSITY: AtomicU8 = AtomicU8::new(0);
 
 #[macro_export]

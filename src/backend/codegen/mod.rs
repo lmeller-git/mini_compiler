@@ -1,9 +1,49 @@
 use std::{collections::HashMap, fmt::Display};
 
+use indexmap::IndexMap;
+
 use crate::frontend::ast::{Ast, Expr, LValue, Line, Operation, Val};
 pub mod x86_64;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug)]
+pub struct ProgramIR {
+    pub functions: indexmap::IndexMap<String, FunctionIR>,
+}
+
+impl ProgramIR {
+    pub fn build(ast: &Ast) -> Self {
+        let mut functions = IndexMap::with_capacity(ast.funcs().count());
+        let mut builder = CodeBuilder::new();
+        for func in ast.funcs() {
+            functions.insert(
+                func.name.clone(),
+                FunctionIR {
+                    body: builder.build(func.body.iter(), func.name.clone()),
+                    name: func.name.clone(),
+                    args: func
+                        .args
+                        .clone()
+                        .into_iter()
+                        .map(|mut arg| {
+                            builder.rename_ident(&mut arg);
+                            arg
+                        })
+                        .collect(),
+                },
+            );
+        }
+        Self { functions }
+    }
+}
+
+#[derive(Debug)]
+pub struct FunctionIR {
+    pub name: String,
+    pub args: Vec<String>,
+    pub body: CodeTree,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct CodeTree {
     data: HashMap<DataUnit, String>,
     units: Vec<CodeUnit>,
@@ -75,11 +115,13 @@ impl Display for Operand {
 pub struct CodeBuilder {
     inner: CodeTree,
     temp_name: usize,
+    context_name: String,
 }
 
 impl CodeBuilder {
     pub fn new() -> Self {
         Self {
+            context_name: String::default(),
             inner: CodeTree::new(),
             temp_name: 0,
         }
@@ -91,36 +133,43 @@ impl CodeBuilder {
         name
     }
 
-    pub fn build(mut self, ast: &Ast) -> CodeTree {
-        for line in ast.lines() {
+    pub fn build<'a>(
+        &mut self,
+        lines: impl Iterator<Item = &'a Line>,
+        context_name: String,
+    ) -> CodeTree {
+        self.context_name = context_name;
+        for line in lines {
             self.lower_line(line);
             self.inner.units.push(CodeUnit::Cleanup);
         }
-        self.inner
+        core::mem::take(&mut self.inner)
     }
 
     fn lower_line(&mut self, line: &Line) {
         match line {
             Line::Expr(e) => _ = self.lower_unit(e),
             Line::Call(f, e) => {
-                let arg = self.lower_unit(e);
+                let args = e.iter().map(|e| self.lower_unit(e)).collect();
                 self.inner.units.push(CodeUnit::FuncCall {
                     name: f.clone(),
-                    args: vec![arg],
+                    args,
                 });
             }
             Line::Decl(v, e) => {
                 let val = self.lower_unit(e);
-                self.inner.units.push(CodeUnit::Assignment {
-                    name: v.clone(),
-                    value: val,
-                });
+                let mut name = v.clone();
+                self.rename_lvalue(&mut name);
+                self.inner
+                    .units
+                    .push(CodeUnit::Assignment { name, value: val });
             }
             Line::Cond(cond, then) => {
                 let cond = self.lower_unit(cond);
                 let label = self.new_temp();
                 let mut builder = CodeBuilder::new();
                 builder.temp_name = self.temp_name;
+                builder.context_name = self.context_name.clone();
                 builder.lower_line(then);
                 self.temp_name = builder.temp_name;
                 self.inner.data.extend(builder.inner.data.drain());
@@ -136,7 +185,11 @@ impl CodeBuilder {
     fn lower_unit(&mut self, expr: &Expr) -> Operand {
         match expr {
             Expr::Val(v) => match v {
-                Val::Var(name) => Operand::Variable(name.clone()),
+                Val::Var(name) => {
+                    let mut name = name.clone();
+                    self.rename_ident(&mut name);
+                    Operand::Variable(name)
+                }
                 Val::V(val) => Operand::Immediate(*val),
                 Val::Lit(lit) => {
                     let unit = DataUnit::StrLit(lit.clone());
@@ -171,6 +224,17 @@ impl CodeBuilder {
             }
         }
     }
+
+    fn rename_lvalue(&mut self, lvalue: &mut LValue) {
+        match lvalue {
+            LValue::Variable(var) => self.rename_ident(var),
+            LValue::Deref(lvalue) => self.rename_lvalue(lvalue.as_mut()),
+        }
+    }
+
+    fn rename_ident(&mut self, ident: &mut String) {
+        *ident = format!("__{}_var_{}", self.context_name, ident);
+    }
 }
 
 #[cfg(test)]
@@ -181,13 +245,15 @@ mod tests {
     #[test]
     fn code() {
         let s = "
+        begin_def main;
             x = 5 + (1 * 2);
             print x + 3;
             y = x * (5 - 2);
             x + 2;
+            end_def
         ";
         let ast = get_ast(s).unwrap();
-        let code = CodeBuilder::new().build(&ast);
+        let code = CodeBuilder::new().build(ast.funcs().next().unwrap().body.iter(), "main".into());
         let code_true = CodeTree {
             data: HashMap::new(),
             units: vec![
@@ -204,13 +270,13 @@ mod tests {
                     dest: Operand::Temp("_temp_1".into()),
                 },
                 CodeUnit::Assignment {
-                    name: LValue::Variable("x".into()),
+                    name: LValue::Variable("__main_var_x".into()),
                     value: Operand::Temp("_temp_1".into()),
                 },
                 CodeUnit::Cleanup,
                 CodeUnit::Operation {
                     op: Operation::Add,
-                    lhs: Operand::Variable("x".into()),
+                    lhs: Operand::Variable("__main_var_x".into()),
                     rhs: Operand::Immediate(3),
                     dest: Operand::Temp("_temp_2".into()),
                 },
@@ -227,18 +293,18 @@ mod tests {
                 },
                 CodeUnit::Operation {
                     op: Operation::Mul,
-                    lhs: Operand::Variable("x".into()),
+                    lhs: Operand::Variable("__main_var_x".into()),
                     rhs: Operand::Temp("_temp_3".into()),
                     dest: Operand::Temp("_temp_4".into()),
                 },
                 CodeUnit::Assignment {
-                    name: LValue::Variable("y".into()),
+                    name: LValue::Variable("__main_var_y".into()),
                     value: Operand::Temp("_temp_4".into()),
                 },
                 CodeUnit::Cleanup,
                 CodeUnit::Operation {
                     op: Operation::Add,
-                    lhs: Operand::Variable("x".into()),
+                    lhs: Operand::Variable("__main_var_x".into()),
                     rhs: Operand::Immediate(2),
                     dest: Operand::Temp("_temp_5".into()),
                 },
