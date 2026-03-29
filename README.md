@@ -8,8 +8,8 @@ A minimal example compiler
 Clone this repository and run:
 
 ```bash
- cargo run --release -- examples/the_answer.txt
- ./examples/target/the_answer
+ cargo run --release -- examples/hello_world.txt
+ ./examples/target/hello_world
 ```
 
 
@@ -29,9 +29,17 @@ Declare a variable with:
 
 ```<ident> = <expr>;```
 
+Define a function with:
+
+```
+begin_def <ident> [ <ident> ( ',' <ident> )* ] ;
+ <line>*
+end_def
+```
+
 Call a function with:
 
-```<func> <expr>;```
+```<ident> [ <expr> ( ',' <expr> )* ];```
 
 Execute some code conditionally with:
 
@@ -52,7 +60,7 @@ Everything else are exprs.
 
 Valid exprs use basic math operators, parentheses, strlits and pointer derefs/refs:
 
-```(<var1> + <var2>) - (<var3> + <var4>);```
+```(<expr> + <expr>) - (<expr> + <expr>);```
 
 
 ## Builtin functions
