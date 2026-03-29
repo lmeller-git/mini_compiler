@@ -571,7 +571,10 @@ impl TempVarStack {
 
     fn stack_aligned(&self) -> bool {
         // assuming rel stack == 0 is aligned
-        self.stack_pushes.is_multiple_of(16)
+        #[allow(clippy::manual_is_multiple_of)]
+        {
+            self.stack_pushes % 16 == 0
+        }
     }
 }
 

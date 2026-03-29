@@ -42,7 +42,10 @@ fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
 }
 
 pub(crate) fn is_builtin_func(ident: &str) -> bool {
-    matches!(ident, "printf" | "exit" | "goto" | "label" | "sqrt")
+    matches!(
+        ident,
+        "print_str" | "print" | "exit" | "goto" | "label" | "sqrt"
+    )
 }
 
 pub struct Ast {
