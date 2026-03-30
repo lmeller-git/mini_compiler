@@ -116,7 +116,9 @@ impl AsmWriter {
 
                     let mut saved_regs = Vec::new();
                     for (op, reg) in args.iter().zip(CALL_ORDER) {
-                        if USAGE[reg as usize].load(Ordering::Relaxed) {
+                        if (reg as usize) < USAGE.len()
+                            && USAGE[reg as usize].load(Ordering::Relaxed)
+                        {
                             self.write_in_fn(format_args!("push {}", reg));
                             saved_regs.push(reg);
                             temps.inc_stack(8);
@@ -426,6 +428,15 @@ impl AsmWriter {
                 self.write_in_fn(format_args!("movzx rax, al"));
                 return;
             }
+            Operation::NEq => {
+                self.write_in_fn(format_args!(
+                    "cmp rax, {}",
+                    self.get_var_str(rhs, vars, temps)
+                ));
+                self.write_in_fn(format_args!("setne al"));
+                self.write_in_fn(format_args!("movzx rax, al"));
+                return;
+            }
             Operation::Load => {
                 let var_location = self.get_var_str(rhs, vars, temps);
                 // double deref, as var_location may be a ptr
@@ -604,15 +615,15 @@ impl TempVarStack {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(usize)]
 enum Reg {
-    R8,
-    R9,
-    R10,
-    R11,
-    RDI,
-    RSI,
-    RCX,
-    RDX,
-    RAX,
+    R8 = 0,
+    R9 = 1,
+    R10 = 2,
+    R11 = 3,
+    RDI = 4,
+    RSI = 5,
+    RCX = 6,
+    RDX = 7,
+    RAX = 8,
 }
 
 impl Display for Reg {

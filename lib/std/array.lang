@@ -1,0 +1,81 @@
+extern_def panic msg;
+
+# Swaps the pointee of in to a pointer to an array of size len bytes.
+# Usage: arr &x, len;
+begin_def arr in, len;
+	goto get_slice;
+	# preallocate a buffer of size N. migth move this to an asm stub later.
+	label allocate;
+	_static_arr_alloc = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\0\0\0\0\0\0";
+	label get_slice;
+	if _static_arr_alloc == 0; goto allocate;
+
+	*in = _static_arr_alloc;
+	arr_builder = 0;
+
+	label build_arr;
+	# if we ran out of memory, crash the program
+	if *_static_arr_alloc == 0; panic "Not enough memory in preallocated array buffer to allocate next array";
+
+	# zero out the allocated memory
+	*_static_arr_alloc = 0;
+
+	_static_arr_alloc = _static_arr_alloc + 8;
+	arr_builder = arr_builder + 1;
+
+	# allocate len + 2 qwords, one to store the len and one to store the end (0)
+	if arr_builder < len + 2; goto build_arr;
+
+	**in = len;
+	*in = *in + 8;
+
+	# next array starts one qword up
+	_static_arr_alloc = _static_arr_alloc + 8;
+end_def
+
+# returns the nth element of array x into to
+# arr is a ptr to an array, i.e. an array returned by function arr and n < len
+# Usage get array, n, &to;
+begin_def get array, n, to;
+	len = *(array - 8);
+	# crash if preconditions are violated
+	if !(n < len); panic "out of bounds access for array get";
+	*to = *(array + n * 8);
+end_def
+
+# sets the element at position at in arr to val
+# arr is a ptr to an array, i.e. an array returned by function arr and at < len
+# Usage: set array, at, val;
+begin_def set array, at, val;
+	len = *(array - 8);
+	# crash if preconditions are violated
+	if !(at < len); panic "out of bounds access for array set";
+	set_loc = array + 8 * at;
+	*set_loc = val;
+end_def
+
+# Prints all elements in an array
+# if print_null is true, also prints past 0 entries
+# arr is a ptr to an array, i.e. an array returned by function arr
+# Usage: print_arr array, print_null;
+begin_def print_arr array, print_null;
+	len = *(array - 8);
+	print_str "[ ";
+	if len == 0; goto end_print;
+
+	i = 0;
+	label print_loop;
+
+	element = *(array + i * 8);
+	if !print_null; if element == 0; goto end_print;
+
+	if i > 0; print_str ", ";
+	print element;
+	i = i + 1;
+
+	if !(i < len); goto end_print;
+	goto print_loop;
+
+	label end_print;
+	print_str " ]";
+end_def

@@ -225,6 +225,7 @@ pub enum Operation {
     Gt,
     Lt,
     EqEq,
+    NEq,
     BitAND,
     BitOR,
     BitXOR,
@@ -243,7 +244,7 @@ impl Operation {
             Self::BitAND => (1.6, 1.7),
             Self::BitXOR => (1.5, 1.6),
             Self::BitOR => (1.4, 1.5),
-            Self::Gt | Self::Lt | Self::EqEq => (1., 1.1),
+            Self::Gt | Self::Lt | Self::EqEq | Self::NEq => (1., 1.1),
         }
     }
 
@@ -272,6 +273,7 @@ impl Operation {
             Token::Gt => Self::Gt,
             Token::Lt => Self::Lt,
             Token::EqEq => Self::EqEq,
+            Token::NEq => Self::NEq,
             tok => return Err(AstErr::BadToken(tok.to_string())),
         })
     }
@@ -352,10 +354,7 @@ impl Val {
                 .parse::<i64>()
                 .map(Self::V)
                 .unwrap_or(Self::Var(t.to_string())),
-            Token::Lit(t) => t
-                .parse::<i64>()
-                .map(Self::V)
-                .unwrap_or(Self::Lit(t.to_string())),
+            Token::Lit(t) => Self::Lit(t.to_string()),
             tok => return Err(AstErr::BadToken(tok.to_string())),
         })
     }
@@ -409,6 +408,7 @@ impl Display for Operation {
             Self::BitXOR => write!(f, "^"),
             Self::Shr => write!(f, ">>"),
             Self::Shl => write!(f, "<<"),
+            Self::NEq => write!(f, "!="),
         }
     }
 }

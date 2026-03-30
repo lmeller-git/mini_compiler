@@ -121,11 +121,11 @@ fn link_with_gcc(obj_files: &[PathBuf], out_path: &Path) {
     let mut args = vec!["-no-pie".to_string()];
 
     for obj in obj_files {
-        args.push(obj.to_str().unwrap().to_string());
+        args.push(obj.display().to_string());
     }
 
     args.push("-o".to_string());
-    args.push(out_path.to_str().unwrap().to_string());
+    args.push(out_path.display().to_string());
 
     let status = Command::new("gcc")
         .args(&args)
