@@ -16,7 +16,7 @@ struct ParserImpl {
     #[arg(required = true)]
     inputs: Vec<PathBuf>,
 
-    #[arg(short, long, default_value = "ext")]
+    #[arg(short, long, default_value = "lang")]
     extension: String,
 
     #[arg(short, long, default_value = "a.out")]
@@ -74,7 +74,6 @@ fn main() {
         }
         for file in files {
             let f_name = file.file_stem().unwrap().to_str().unwrap();
-            print_if!(1, "Compiling {}", file.display());
 
             let asm_path = if ext == "asm" {
                 file
@@ -88,6 +87,7 @@ fn main() {
             };
 
             if ext != "asm" {
+                print_if!(1, "Compiling {}", file.display());
                 let mut s = String::new();
                 File::open(file).unwrap().read_to_string(&mut s).unwrap();
 
