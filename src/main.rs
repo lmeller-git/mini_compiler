@@ -16,6 +16,9 @@ struct ParserImpl {
     #[arg(required = true)]
     inputs: Vec<PathBuf>,
 
+    #[arg(short, long, default_value = "ext")]
+    extension: String,
+
     #[arg(short, long, default_value = "a.out")]
     output: String,
 
@@ -66,6 +69,9 @@ fn main() {
     print_if!(1, "compiling {} files...", files.len());
 
     for (ext, files) in &files {
+        if !["asm", "o", &args.extension].contains(&ext.as_ref()) {
+            continue;
+        }
         for file in files {
             let f_name = file.file_stem().unwrap().to_str().unwrap();
             print_if!(1, "Compiling {}", file.display());
@@ -75,7 +81,11 @@ fn main() {
             } else {
                 &target_dir.join(format!("{}.asm", f_name))
             };
-            let obj_path = target_dir.join(format!("{}.o", f_name));
+            let obj_path = if ext == "o" {
+                file.clone()
+            } else {
+                target_dir.join(format!("{}.o", f_name))
+            };
 
             if ext != "asm" {
                 let mut s = String::new();

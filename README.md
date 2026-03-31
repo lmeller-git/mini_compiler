@@ -31,6 +31,14 @@ For more options refer to
 cargo run --release -- --help
 ```
 
+The compiler accepts a list of files and directories. Passed assembly files will not be compiled, but directly assembled and included.
+Passed object files will not be compiled or assembled, but included.
+All children of directories with extension `ext` will be compiled.
+
+To link against the std library simply include `<path to mini_compiler_repo>/lib/std`
+
+To call functions via FFI, use `c_call` or `c_call_arr` in `lib/std/ffi.asm`
+
 ## Syntax
 
 Declare a variable with:
@@ -87,6 +95,7 @@ The current supported builtin functions are
 - label
 - goto
 - sqrt
+- addr_of
 
 ## Supported targets
 

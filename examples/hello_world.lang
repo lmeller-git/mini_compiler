@@ -1,11 +1,4 @@
-extern_def arr in, len;
-extern_def get arr, n, to;
-extern_def set arr, at, val;
-extern_def print_arr arr;
-
 # This is a comment
-
-extern_def hey input;
 
 begin_def hello input1, input2;
 	print_str input1;
@@ -19,32 +12,4 @@ begin_def main;
 	hello hello_world, "from func hello\n";
 
 	if 1; if !0; print_str "this is an if\n";
-
-	array = 0;
-	arr &array, 10;
-	print array;
-	set array, 0, 52;
-	set array, 1, 48;
-	print_str "\nthe array is: ";
-	print_arr array;
-	print_str "\n";
-
-	ele = 0;
-	get array, 0, &ele;
-	print ele;
-	print_str "\n";
-
-	array2 = 0;
-	arr &array2, 10;
-	set array2, 0, 4242;
-	set array2, 5, 5;
-
-	print_str "array2 is: ";
-	print_arr array2;
-	print_str "\n";
-	print_str "array1 is: ";
-	print_arr array;
-	print_str "\n";
-
-
 end_def
