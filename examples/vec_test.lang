@@ -1,0 +1,63 @@
+extern_def vec;
+extern_def len;
+extern_def cap;
+extern_def push;
+extern_def pop;
+extern_def insert;
+extern_def remove;
+extern_def print_vec;
+extern_def drop;
+extern_def println;
+
+
+begin_def main;
+    vector = 0;
+    vec &vector, 0;
+
+    length = 0;
+    capacity = 0;
+
+    len vector, &length;
+    cap vector, &capacity;
+    print_str "len: ";
+    println length;
+    print_str "cap: ";
+    println capacity;
+    print_str "\n";
+
+    push &vector, 1;
+    push &vector, 2;
+    push &vector, 3;
+    push &vector, 4;
+
+    print_vec vector;
+    print_str "\n";
+
+    popped_val = 0;
+    pop &vector, &popped_val;
+
+    print_str "popped: ";
+    println popped_val;
+    print_vec vector;
+    print_str "\n";
+
+    insert &vector, 42, 1;
+
+    print_vec vector;
+    print_str "\n";
+
+	label push;
+	push &vector, 42;
+	len vector, &length;
+	if length < 100; goto push;
+    cap vector, &capacity;
+
+	print_vec vector;
+	print_str "\n";
+
+    print_str "len: ";
+    println length;
+    print_str "cap: ";
+    println capacity;
+end_def
+

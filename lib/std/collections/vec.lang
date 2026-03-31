@@ -1,0 +1,162 @@
+extern_def panic;
+extern_def ppanic;
+extern_def call_malloc;
+extern_def call_realloc;
+extern_def call_free;
+extern_def call_calloc;
+extern_def call_memcpy;
+extern_def call_memmove;
+extern_def call_memset;
+extern_def println;
+# extern_def arr;
+# extern_def set;
+
+# Vectors store cap at vec_ptr - 16 and length ad vec_ptr - 8
+
+# Allocates a new vector with cap cap and stores its address in *to
+# Usage: vec &to, cap;
+begin_def vec to, cap;
+	call_calloc to, cap + 3, 8;
+	if !*to; panic "ran out of heap memory";
+	**to = cap + 1;
+	*to = *to + 16;
+end_def
+
+# Usage: len vector, &to;
+begin_def len vector, to;
+	*to = *(vector - 8);
+end_def
+
+# Usage: cap vector, &to;
+begin_def cap vector, to;
+	*to = *(vector - 16);
+end_def
+
+# Internal
+# Usage __realloc_vec &new, old;
+begin_def __realloc_vec new, old;
+	old_cap = *(old - 16);
+	old_len = *(old - 8);
+
+	if !(old_cap > 512); goto double_it;
+	old_cap = old_cap + 512;
+	goto realloc;
+
+	label double_it;
+	old_cap = old_cap * 2;
+
+	label realloc;
+	call_realloc new, old - 16, old_cap * 8 + 16;
+
+	if !*new; panic "ran out of heap memory";
+	**new = old_cap;
+	_len_bytes = *new + 8;
+	*_len_bytes = old_len;
+	*new = *new + 16;
+end_def
+
+# Internal
+# Usage __bound_violation length, idx, msg;
+begin_def __bound_violation length, idx, msg;
+	print_str "vec bound violation:\nthe len is: ";
+	print length;
+	print_str " but the index is: ";
+	print idx;
+	print_str "\n";
+	panic msg;
+end_def
+
+# Usage: push &vector, value;
+begin_def push vector, value;
+	_len_bytes = *vector - 8;
+	if *(*vector - 16) > *_len_bytes; goto push;
+	# need to realloc
+	__realloc_vec vector, *vector;
+
+	_len_bytes = *vector - 8;
+
+	label push;
+	_push_to_bytyes = *vector + *_len_bytes * 8;
+	*_push_to_bytyes = value;
+	*_len_bytes = *_len_bytes + 1;
+end_def
+
+# Usage: insert &vector, value, at;
+begin_def insert vector, value, at;
+	_len_bytes = *vector - 8;
+	if at < *_len_bytes; goto within;
+	if at > *_len_bytes; __bound_violation *_len_bytes, at, "in insert";
+	# this insert is a push (at == len)
+	push vector, value;
+	goto exit;
+
+	label within;
+	if *(*vector - 16) > *_len_bytes; goto insert;
+	# need to realloc
+	__realloc_vec vector, *vector;
+	_len_bytes = *vector - 8;
+
+	label insert;
+	call_memmove *vector + at * 8 + 8, *vector + at * 8, (*_len_bytes - at) * 8;
+
+	_insert_bytes = *vector + 8 * at;
+	*_insert_bytes = value;
+	*_len_bytes = *_len_bytes + 1;
+
+	label exit;
+end_def
+
+# Usage: pop &vector, &to;
+begin_def pop vector, to;
+	_len_bytes = *vector - 8;
+	if *_len_bytes; goto non_empty;
+	*to = 0;
+	goto exit;
+
+	label non_empty;
+	*_len_bytes = *_len_bytes - 1;
+	*to = *(*vector + (*_len_bytes * 8));
+	_popped_from_bytes = *vector + *_len_bytes * 8;
+	*_popped_from_bytes = 0;
+
+	label exit;
+end_def
+
+# Usage: remove &vector, from, &to
+begin_def remove vector, from, to;
+	_len_bytes = *vector - 8;
+	if from < *_len_bytes; goto within;
+	if from > *_len_bytes; __bound_violation *_len_bytes, from, "in remove";
+	# this remove is a pop (from == len)
+	pop vector, to;
+	goto exit;
+
+	label within;
+	*to = *(*vector + 8 * from);
+	call_memmove *vector + from * 8, *vector + from * 8 + 8, (*_len_bytes - from) * 8 - 8;
+	*_len_bytes = *(*vector - 8) - 1;
+
+	label exit;
+end_def
+
+# Usage: drop vector;
+begin_def drop vector;
+	call_free vector - 16;
+end_def
+
+# Usage: print_vec vector;
+begin_def print_vec vector;
+	print_str "vec[ ";
+	if !*(vector - 8); goto exit;
+
+	i = 0;
+	label print_loop;
+	if i > 0; print_str ", ";
+	print *(vector + i * 8);
+	i = i + 1;
+	if i < *(vector - 8); goto print_loop;
+
+	label exit;
+	print_str " ]";
+end_def
+
