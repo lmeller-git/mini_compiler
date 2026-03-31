@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use indexmap::IndexMap;
 
-use crate::frontend::ast::{Ast, Expr, LValue, Line, Operation, Val};
+use crate::frontend::ast::{Ast, Expr, LValue, Line, Operation, Val, is_builtin_func};
 pub mod x86_64;
 
 #[derive(Debug)]
@@ -174,7 +174,11 @@ impl CodeBuilder {
         match line {
             Line::Expr(e) => _ = self.lower_unit(e),
             Line::Call(f, e) => {
-                let args = e.iter().map(|e| self.lower_unit(e)).collect();
+                let args = if is_builtin_func(f) {
+                    self.lower_builtin(f, e)
+                } else {
+                    e.iter().map(|e| self.lower_unit(e)).collect()
+                };
                 self.inner.units.push(CodeUnit::FuncCall {
                     name: f.clone(),
                     args,
@@ -203,6 +207,42 @@ impl CodeBuilder {
                     label,
                 });
             }
+        }
+    }
+
+    fn lower_builtin(&mut self, name: &str, exprs: &[Expr]) -> Vec<Operand> {
+        match name {
+            "addr_of" => {
+                // here we expect two args: [Variable(Ident), Operation (the target to store the result to)]
+                // We search the current function for variables of matching names, if one is found we return its addr, else we assume this to be an external symbol
+                debug_assert_eq!(exprs.len(), 2);
+                let var = &exprs[0];
+                let to = &exprs[1];
+                let Expr::Val(Val::Var(ident)) = var else {
+                    panic!("currently only idents may be passed to addr_of");
+                };
+
+                let mut ident_as_var = ident.to_string();
+                self.rename_ident(&mut ident_as_var);
+
+                let ident = if self.inner.units.iter().any(|unit| {
+                    if let CodeUnit::Assignment { name, value: _ } = unit
+                        && let LValue::Variable(name) = name
+                        && *name == ident_as_var
+                    {
+                        true
+                    } else {
+                        false
+                    }
+                }) {
+                    ident_as_var
+                } else {
+                    ident.to_string()
+                };
+
+                vec![Operand::Variable(ident), self.lower_unit(to)]
+            }
+            _ => exprs.iter().map(|e| self.lower_unit(e)).collect(),
         }
     }
 

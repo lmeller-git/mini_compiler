@@ -55,10 +55,9 @@ begin_def set array, at, val;
 end_def
 
 # Prints all elements in an array
-# if print_null is true, also prints past 0 entries
 # arr is a ptr to an array, i.e. an array returned by function arr
-# Usage: print_arr array, print_null;
-begin_def print_arr array, print_null;
+# Usage: print_arr array;
+begin_def print_arr array;
 	len = *(array - 8);
 	print_str "[ ";
 	if len == 0; goto end_print;
@@ -67,7 +66,6 @@ begin_def print_arr array, print_null;
 	label print_loop;
 
 	element = *(array + i * 8);
-	if !print_null; if element == 0; goto end_print;
 
 	if i > 0; print_str ", ";
 	print element;

@@ -81,7 +81,7 @@ pub(crate) fn is_func(funcs: &IndexMap<String, Function>, ident: &str) -> bool {
 pub(crate) fn is_builtin_func(ident: &str) -> bool {
     matches!(
         ident,
-        "print_str" | "print" | "exit" | "goto" | "label" | "sqrt"
+        "print_str" | "print" | "exit" | "goto" | "label" | "sqrt" | "addr_of"
     )
 }
 
@@ -171,6 +171,7 @@ pub enum Line {
     Cond(Expr, Box<Line>),
 }
 
+#[derive(Debug)]
 pub enum Expr {
     Val(Val),
     Op(Box<Expr>, Operation, Box<Expr>),
@@ -279,7 +280,7 @@ impl Operation {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Val {
     Var(String),
     V(i64),

@@ -1,7 +1,7 @@
 extern_def arr in, len;
 extern_def get arr, n, to;
 extern_def set arr, at, val;
-extern_def print_arr arr, print_null;
+extern_def print_arr arr;
 
 # This is a comment
 
@@ -26,7 +26,7 @@ begin_def main;
 	set array, 0, 52;
 	set array, 1, 48;
 	print_str "\nthe array is: ";
-	print_arr array, 1;
+	print_arr array;
 	print_str "\n";
 
 	ele = 0;

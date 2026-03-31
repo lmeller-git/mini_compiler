@@ -1,0 +1,36 @@
+extern_def malloc size;
+extern_def call_c func, to, arg1, arg2, arg3, arg4;
+
+begin_def main argc, argv;
+	print_str "we got ";
+	print argc;
+	print_str " arguments\nThe arguments are:\n";
+
+	i = 0;
+	label print_loop;
+	print_str *(argv + (i * 8));
+	print_str "\n";
+	i = i + 1;
+	if i < argc; goto print_loop;
+
+	malloc_loc = 0;
+	addr_of malloc, &malloc_loc;
+	print malloc_loc;
+	print_str "\n";
+
+	heap_location = 0;
+
+	call_c malloc_loc, &heap_location, 1;
+
+	print heap_location;
+	print_str "\n";
+
+	print *heap_location;
+	print_str "\n";
+
+	*heap_location = 42;
+
+	print *heap_location;
+	print_str "\n";
+
+end_def

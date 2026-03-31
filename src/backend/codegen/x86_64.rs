@@ -241,6 +241,7 @@ impl AsmWriter {
                 self.write_in_fn(format_args!("mov edi, 0"));
                 self.write_in_fn(format_args!("call exit"));
             }
+            "addr_of" => self.builtin_addr_of(args, vars, temps),
             "goto" => self.write_in_fn(format_args!("jmp {}", args[0])),
             "label" => writeln!(self.fh, "{}:", args[0]).unwrap(),
             "sqrt" => {
@@ -271,6 +272,33 @@ impl AsmWriter {
             }
 
             _ => {}
+        }
+    }
+
+    fn builtin_addr_of(&mut self, args: &[Operand], vars: &Vars, temps: &mut TempVarStack) {
+        let addr_getter = match &args[0] {
+            Operand::Variable(ident) => &format!("lea rax, [rel {}]", ident),
+            _ => "xor rax, rax",
+        };
+
+        let rcx_usage = USAGE[Reg::RCX as usize].load(Ordering::Relaxed);
+        if rcx_usage {
+            self.write_in_fn(format_args!("push rcx"));
+            temps.inc_stack(8);
+        }
+
+        self.write_in_fn(format_args!(
+            "mov rcx, {}",
+            self.get_var_str(&args[1], vars, temps)
+        ));
+
+        self.write_in_fn(format_args!("{}", addr_getter));
+
+        self.write_in_fn(format_args!("mov [rcx], rax"));
+
+        if rcx_usage {
+            self.write_in_fn(format_args!("pop rcx"));
+            temps.dec_stack(8);
         }
     }
 

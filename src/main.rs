@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs::{self, File},
     io::Read,
     path::{Path, PathBuf},
@@ -8,8 +9,6 @@ use std::{
 
 use clap::Parser;
 use mini_compiler::{VERBOSITY, backend, frontend::get_ast, print_if};
-
-const EXT: &str = "lang";
 
 #[derive(clap::Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -31,13 +30,18 @@ fn main() {
     let args = ParserImpl::parse();
     VERBOSITY.store(args.verbosity, Ordering::Relaxed);
 
-    let mut files = Vec::new();
+    let mut files: HashMap<String, Vec<PathBuf>> = HashMap::new();
+
     for path in &args.inputs {
         if path.is_dir() {
-            files.extend(recursive_collect(path));
-        } else if path.is_file() {
-            // ignore EXT for manually added files
-            files.push(path.clone());
+            recursive_collect(path, &mut files);
+        } else if path.is_file()
+            && let Some(ext) = path.extension().and_then(|s| s.to_str())
+        {
+            files
+                .entry(ext.to_string())
+                .and_modify(|f| f.push(path.clone()))
+                .or_insert(vec![path.clone()]);
         } else {
             panic!("Input file not found: {}", path.display());
         }
@@ -61,33 +65,40 @@ fn main() {
 
     print_if!(1, "compiling {} files...", files.len());
 
-    for file in &files {
-        let f_name = file.file_stem().unwrap().to_str().unwrap();
-        print_if!(1, "Compiling {}", file.display());
+    for (ext, files) in &files {
+        for file in files {
+            let f_name = file.file_stem().unwrap().to_str().unwrap();
+            print_if!(1, "Compiling {}", file.display());
 
-        let mut s = String::new();
-        File::open(file).unwrap().read_to_string(&mut s).unwrap();
+            let asm_path = if ext == "asm" {
+                file
+            } else {
+                &target_dir.join(format!("{}.asm", f_name))
+            };
+            let obj_path = target_dir.join(format!("{}.o", f_name));
 
-        let ast = get_ast(&s).unwrap();
-        print_if!(2, "AST for {}: {}", f_name, ast);
+            if ext != "asm" {
+                let mut s = String::new();
+                File::open(file).unwrap().read_to_string(&mut s).unwrap();
 
-        let code = backend::generate(&ast).unwrap();
-        print_if!(2, "IR for {}: {:#?}", f_name, code);
+                let ast = get_ast(&s).unwrap();
+                print_if!(2, "AST for {}: {}", f_name, ast);
 
-        let asm_path = target_dir.join(format!("{}.asm", f_name));
-        let obj_path = target_dir.join(format!("{}.o", f_name));
+                let code = backend::generate(&ast).unwrap();
+                print_if!(2, "IR for {}: {:#?}", f_name, code);
 
-        backend::asm_gen(code, &asm_path).unwrap();
+                backend::asm_gen(code, asm_path).unwrap();
+            }
 
-        print_if!(
-            1,
-            "Assembling {} to {}",
-            asm_path.display(),
-            obj_path.display()
-        );
-        assemble(&asm_path, &obj_path);
-
-        obj_files.push(obj_path);
+            print_if!(
+                1,
+                "Assembling {} to {}",
+                asm_path.display(),
+                obj_path.display()
+            );
+            assemble(asm_path, &obj_path);
+            obj_files.push(obj_path);
+        }
     }
 
     let final_binary = target_dir.join(&args.output);
@@ -134,18 +145,20 @@ fn link_with_gcc(obj_files: &[PathBuf], out_path: &Path) {
     assert!(status.success(), "gcc linking failed");
 }
 
-fn recursive_collect(dir: &Path) -> Vec<PathBuf> {
-    let mut files = Vec::new();
+fn recursive_collect(dir: &Path, files: &mut HashMap<String, Vec<PathBuf>>) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
-            let p = entry.path();
-            if p.is_file() && p.extension().and_then(|s| s.to_str()) == Some(EXT) {
-                files.push(p);
-            } else if p.is_dir() {
-                files.extend(recursive_collect(&p));
+            let path = entry.path();
+            if path.is_file()
+                && let Some(ext) = path.extension().and_then(|s| s.to_str())
+            {
+                files
+                    .entry(ext.to_string())
+                    .and_modify(|f| f.push(path.clone()))
+                    .or_insert(vec![path.clone()]);
+            } else if path.is_dir() {
+                recursive_collect(&path, files);
             }
         }
     }
-
-    files
 }
