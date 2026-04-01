@@ -1,7 +1,7 @@
 # prints all strings in messages
 # messages is a ptr to an array, i.e. an array returned by function arr containing ptrs to stringliterals
 # Usage: print_all messages;
-begin_def print_all messages_;
+public begin_def print_all messages_;
 	len = *(messages_ - 8);
 	if len == 0; goto end;
 
@@ -20,7 +20,7 @@ end_def
 # prints all strings in messages and aborts the program
 # messages is a ptr to an array, i.e. an array returned by function arr containing ptrs to stringliterals
 # Usage: panic messages;
-begin_def ppanic messages;
+public begin_def ppanic messages;
 	print_str "Explicit panic:\n";
 	print_all messages;
 	print_str "\nAborting the program...\n";
@@ -30,14 +30,14 @@ end_def
 # prints msg and aborts the program
 # msg is a stringliteral
 # Usage: panic msg;
-begin_def panic msg;
+public begin_def panic msg;
 	print_str "Explicit panic:\n";
 	print_str msg;
 	print_str "\nAborting the program...\n";
 	exit 1;
 end_def
 
-begin_def println msg;
+public begin_def println msg;
 	print msg;
 	print_str "\n";
 end_def

@@ -10,7 +10,7 @@ extern_def drop;
 extern_def println;
 
 
-begin_def main;
+public begin_def main;
     vector = 0;
     vec &vector, 0;
 

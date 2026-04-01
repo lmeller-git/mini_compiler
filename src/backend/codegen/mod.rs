@@ -32,6 +32,7 @@ impl ProgramIR {
                                 arg
                             })
                             .collect(),
+                        is_public: func.is_public,
                     },
                 );
             } else {
@@ -49,6 +50,7 @@ impl ProgramIR {
                             })
                             .collect(),
                         body: CodeTree::default(),
+                        is_public: func.is_public,
                     },
                 );
             }
@@ -65,6 +67,7 @@ pub struct FunctionIR {
     pub name: String,
     pub args: Vec<String>,
     pub body: CodeTree,
+    pub is_public: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]

@@ -38,8 +38,10 @@ impl AsmWriter {
         for extern_func in code.external.keys() {
             writeln!(file, "\textern {}", extern_func).unwrap();
         }
-        for local_func in code.functions.keys() {
-            writeln!(file, "\tglobal {}", local_func).unwrap();
+        for (name, func) in code.functions.iter() {
+            if func.is_public {
+                writeln!(file, "\tglobal {}", name).unwrap();
+            }
         }
         writeln!(file).unwrap();
 

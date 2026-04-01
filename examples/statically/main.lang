@@ -1,5 +1,5 @@
 extern_def hello;
 
-begin_def main;
+public begin_def main;
 	hello;
 end_def

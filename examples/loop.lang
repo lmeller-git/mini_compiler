@@ -1,5 +1,5 @@
 
-begin_def main;
+public begin_def main;
 	hello_world = "hello world\n";
 	x = 0;
 

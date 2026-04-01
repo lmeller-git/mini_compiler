@@ -1,4 +1,4 @@
-begin_def print_all input1, input2;
+public begin_def print_all input1, input2;
 	print_str input1;
 	print_str input2;
 end_def

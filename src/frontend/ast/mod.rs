@@ -114,12 +114,18 @@ pub struct Function {
     pub name: String,
     pub body: Option<Vec<Line>>,
     pub args: Vec<String>,
+    pub is_public: bool,
 }
 
 impl Function {
     fn parse(funcs: &IndexMap<String, Function>, stream: &mut TokenStream) -> Result<Self, AstErr> {
-        let kw = stream.peek();
+        let mut kw = stream.peek();
 
+        let is_public = *kw == Token::Keyword("public");
+        if is_public {
+            stream.advance();
+            kw = stream.peek();
+        }
         let has_body = match kw {
             Token::Keyword("extern_def") => false,
             Token::Keyword("begin_def") => true,
@@ -149,12 +155,14 @@ impl Function {
                 name,
                 body: Some(body),
                 args,
+                is_public,
             })
         } else {
             Ok(Self {
                 name,
                 body: None,
                 args,
+                is_public,
             })
         }
     }

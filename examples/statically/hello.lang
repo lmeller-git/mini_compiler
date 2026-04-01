@@ -1,5 +1,5 @@
 extern_def print_all input1, input2;
 
-begin_def hello;
+public begin_def hello;
 	print_all "hello ", "world\n";
 end_def

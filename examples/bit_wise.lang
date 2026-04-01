@@ -1,4 +1,4 @@
-begin_def main;
+public begin_def main;
 	print_str "--- Testing Bitwise & Logic ---\n";
 
 	counter = 0;

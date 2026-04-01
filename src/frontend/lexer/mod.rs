@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-static KEYWORDS: &[&str] = &["if", "begin_def", "end_def", "extern_def"];
+static KEYWORDS: &[&str] = &["if", "begin_def", "end_def", "extern_def", "public"];
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, PartialEq, Eq)]

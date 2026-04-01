@@ -5,7 +5,7 @@ extern_def arr to, len;
 extern_def set array, at, with;
 extern_def print_arr array;
 
-begin_def main argc, argv;
+public begin_def main argc, argv;
 	print_str "we got ";
 	print argc;
 	print_str " arguments\nThe arguments are:\n";

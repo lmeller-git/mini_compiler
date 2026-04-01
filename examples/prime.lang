@@ -1,6 +1,6 @@
 extern_def parse_argv_to_int arg, to;
 
-begin_def main argc, argv;
+public begin_def main argc, argv;
 	print_str "we got ";
 	print argc;
 	print_str " arguments\n";

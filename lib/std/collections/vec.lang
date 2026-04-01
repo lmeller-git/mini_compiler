@@ -15,7 +15,7 @@ extern_def println;
 
 # Allocates a new vector with cap cap and stores its address in *to
 # Usage: vec &to, cap;
-begin_def vec to, cap;
+public begin_def vec to, cap;
 	call_calloc to, cap + 3, 8;
 	if !*to; panic "ran out of heap memory";
 	**to = cap + 1;
@@ -23,12 +23,12 @@ begin_def vec to, cap;
 end_def
 
 # Usage: len vector, &to;
-begin_def len vector, to;
+public begin_def len vector, to;
 	*to = *(vector - 8);
 end_def
 
 # Usage: cap vector, &to;
-begin_def cap vector, to;
+public begin_def cap vector, to;
 	*to = *(vector - 16);
 end_def
 
@@ -67,7 +67,7 @@ begin_def __bound_violation length, idx, msg;
 end_def
 
 # Usage: push &vector, value;
-begin_def push vector, value;
+public begin_def push vector, value;
 	_len_bytes = *vector - 8;
 	if *(*vector - 16) > *_len_bytes; goto push;
 	# need to realloc
@@ -82,7 +82,7 @@ begin_def push vector, value;
 end_def
 
 # Usage: insert &vector, value, at;
-begin_def insert vector, value, at;
+public begin_def insert vector, value, at;
 	_len_bytes = *vector - 8;
 	if at < *_len_bytes; goto within;
 	if at > *_len_bytes; __bound_violation *_len_bytes, at, "in insert";
@@ -107,7 +107,7 @@ begin_def insert vector, value, at;
 end_def
 
 # Usage: pop &vector, &to;
-begin_def pop vector, to;
+public begin_def pop vector, to;
 	_len_bytes = *vector - 8;
 	if *_len_bytes; goto non_empty;
 	*to = 0;
@@ -123,7 +123,7 @@ begin_def pop vector, to;
 end_def
 
 # Usage: remove &vector, from, &to
-begin_def remove vector, from, to;
+public begin_def remove vector, from, to;
 	_len_bytes = *vector - 8;
 	if from < *_len_bytes; goto within;
 	if from > *_len_bytes; __bound_violation *_len_bytes, from, "in remove";
@@ -140,12 +140,12 @@ begin_def remove vector, from, to;
 end_def
 
 # Usage: drop vector;
-begin_def drop vector;
+public begin_def drop vector;
 	call_free vector - 16;
 end_def
 
 # Usage: print_vec vector;
-begin_def print_vec vector;
+public begin_def print_vec vector;
 	print_str "vec[ ";
 	if !*(vector - 8); goto exit;
 

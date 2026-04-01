@@ -5,7 +5,7 @@ begin_def hello input1, input2;
 	print_str input2;
 end_def
 
-begin_def main;
+public begin_def main;
 	hello_world = "hello world\n"; # This is a string
 
 	print_str hello_world; # This prints a string

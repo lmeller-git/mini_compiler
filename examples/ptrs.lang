@@ -1,4 +1,4 @@
-begin_def main;
+public begin_def main;
 	descriptor = "\nthe value is now: ";
 
 	value = 42;

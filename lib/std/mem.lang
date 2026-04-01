@@ -10,7 +10,7 @@ extern_def memmove;
 
 # Frees previously allocated heap memory.
 # Usage: call_free ptr
-begin_def call_free value;
+public begin_def call_free value;
     c_free = 0;
     addr_of free, &c_free;
 
@@ -19,7 +19,7 @@ end_def
 
 # Allocates uninitialized heap memory.
 # Usage: call_malloc &ptr_result, size
-begin_def call_malloc to, size;
+public begin_def call_malloc to, size;
     c_malloc = 0;
     addr_of malloc, &c_malloc;
 
@@ -28,7 +28,7 @@ end_def
 
 # Allocates zero-initialized heap memory for an array of elements.
 # Usage: call_calloc &ptr_result, count, size
-begin_def call_calloc to, count, size;
+public begin_def call_calloc to, count, size;
     c_calloc = 0;
     addr_of calloc, &c_calloc;
 
@@ -37,7 +37,7 @@ end_def
 
 # Resizes previously allocated heap memory, returning the new address.
 # Usage: call_realloc &ptr_result, old_ptr, new_size
-begin_def call_realloc new, old, size;
+public begin_def call_realloc new, old, size;
     c_realloc = 0;
     addr_of realloc, &c_realloc;
 
@@ -46,7 +46,7 @@ end_def
 
 # Fills a block of memory with a specific byte value.
 # Usage: call_memset dest_ptr, value, size
-begin_def call_memset at, with, size;
+public begin_def call_memset at, with, size;
     c_memset = 0;
     addr_of memset, &c_memset;
 
@@ -55,7 +55,7 @@ end_def
 
 # Copies memory from source to destination (memory blocks cannot overlap).
 # Usage: call_memcpy dest_ptr, src_ptr, size
-begin_def call_memcpy to, from, size;
+public begin_def call_memcpy to, from, size;
     c_memcpy = 0;
     addr_of memcpy, &c_memcpy;
 
@@ -64,7 +64,7 @@ end_def
 
 # Copies memory from source to destination (safe for overlapping memory blocks).
 # Usage: call_memmove dest_ptr, src_ptr, size
-begin_def call_memmove to, from, size;
+public begin_def call_memmove to, from, size;
     c_memmove = 0;
     addr_of memmove, &c_memmove;
 
