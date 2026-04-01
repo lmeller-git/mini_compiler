@@ -1,13 +1,147 @@
 extern_def panic;
 extern_def println;
 extern_def vec;
+extern_def vec_len;
+extern_def vec_cap;
 extern_def vec_push;
 extern_def vec_pop;
 extern_def vec_insert;
 extern_def vec_remove;
-extern_def drop;
+extern_def vec_drop;
+extern_def vec_get;
+extern_def vec_set;
+extern_def call_memmove;
+extern_def call_memcpy;
+
+# A String is just a Vec, where each element holds 8 ascii chars
+# The first slot holds the len
 
 # Usage: string &to, cap;
 public begin_def string to, cap;
-	panic "todo";
+	if cap % 8 == 0; goto alloc;
+	cap = cap + 8;
+	label alloc;
+	vec to, cap / 8 + 2;
+	vec_push to, 0;
+	vec_push to, 0;
 end_def
+
+# Usage: str_len string, &to;
+public begin_def str_len str, to;
+	*to = *str;
+end_def
+
+# Usage str_cap string, &to;
+public begin_def str_cap str, to;
+	vec_cap str, to;
+	*to = (*to - 1) * 8;
+end_def
+
+# Internal
+# Usage __bound_violation length, idx, msg;
+begin_def __bound_violation length, idx, msg;
+	print_str "str bound violation:\nthe len is: ";
+	print length;
+	print_str " but the index is: ";
+	print idx;
+	print_str "\n";
+	panic msg;
+end_def
+
+# Internal
+# Usgae: __insert_byte, &at, byte;
+begin_def __insert_byte at, byte;
+	# insert only the lowest byte of value into the buffer
+	asm "
+	mov rax, [____insert_byte_var_at]
+	mov rcx, [____insert_byte_var_byte]
+	mov byte [rax], cl
+	";
+end_def
+
+# Usage: str_push &string, value;
+public begin_def str_push str, value;
+	if (**str % 8) != 7; goto insert_value;
+	vec_push str, 0;
+
+	label insert_value;
+	byte_position = *str + **str + 8;
+	__insert_byte byte_position, value;
+
+	**str = **str + 1;
+end_def
+
+# Usage: str_insert &string, value, at;
+public begin_def str_insert str, value, at;
+	if at < **str; goto within;
+	if at > **str; __bound_violation **str, at, "in insert";
+	# this insert is a push (at == len)
+	str_push str, value;
+	goto exit;
+
+	label within;
+	if (**str % 8) != 7; goto insert;
+	# need to realloc
+	vec_push str, 0;
+
+	label insert;
+	call_memmove *str + at + 9, *str + at + 8, **str - at;
+	_byte_position = *str + at + 8;
+	__insert_byte _byte_position, value;
+	**str = **str + 1;
+
+	label exit;
+end_def
+
+# Usage: str_pop &str, &to;
+public begin_def str_pop str, to;
+	if **str; goto non_empty;
+	*to = 0;
+	goto exit;
+
+	label non_empty;
+	**str = **str - 1;
+	_popped_from_bytes = *str + **str + 8;
+	*to = *_popped_from_bytes;
+	__insert_byte _popped_from_bytes, 0;
+
+	label exit;
+end_def
+
+# Usage: str_remove, &str, from, &to;
+public begin_def str_remove str, from, to;
+	if from < **str; goto within;
+	if from > **str; __bound_violation **str, from, "in remove";
+	# this remove is a pop (from == len)
+	str_pop str, to;
+	goto exit;
+
+	label within;
+	*to = *(*str + from + 8);
+	call_memmove *str + from + 8, *str + from + 9, (**str - from) - 1;
+	**str = **str - 1;
+
+	label exit;
+end_def
+
+# Usage: str_push_strlit &str, strlit;
+public begin_def str_push_strlit str, strlit;
+	len = 0;
+	label compute_len;
+	if !*(strlit + len); goto exit;
+	str_push str, *(strlit + len);
+	len = len + 1;
+	goto compute_len;
+	label exit;
+end_def
+
+# Usage str_as_ptr str, &to;
+public begin_def str_as_ptr str, to;
+	*to = str + 8;
+end_def
+
+# Usage: str_dop str;
+public begin_def str_drop str;
+	vec_drop str;
+end_def
+

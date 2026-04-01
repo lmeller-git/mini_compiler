@@ -11,7 +11,7 @@ extern_def println;
 # extern_def arr;
 # extern_def set;
 
-# Vectors store cap at vec_ptr - 16 and length ad vec_ptr - 8
+# Vectors store cap at vec_ptr - 16 and length at vec_ptr - 8
 
 # Allocates a new vector with cap cap and stores its address in *to
 # Usage: vec &to, cap;
@@ -66,6 +66,19 @@ begin_def __bound_violation length, idx, msg;
 	panic msg;
 end_def
 
+# Usage vec_get vector, at, &to;
+public begin_def vec_get vector, at, to;
+	if !(*(vector - 8) > at); __bound_violation *(vector - 8), at, "in get";
+	*to = *(vector + at * 8);
+end_def
+
+# Usage: vec_set vector, at, value;
+public begin_def vec_set vector, at, value;
+	if !(*(vector - 8) > at); __bound_violation *(vector - 8), at, "in get";
+	slot = vector + at * 8;
+	*slot = value;
+end_def
+
 # Usage: vec_push &vector, value;
 public begin_def vec_push vector, value;
 	_len_bytes = *vector - 8;
@@ -115,8 +128,8 @@ public begin_def vec_pop vector, to;
 
 	label non_empty;
 	*_len_bytes = *_len_bytes - 1;
-	*to = *(*vector + (*_len_bytes * 8));
 	_popped_from_bytes = *vector + *_len_bytes * 8;
+	*to = *_popped_from_bytes;
 	*_popped_from_bytes = 0;
 
 	label exit;

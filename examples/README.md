@@ -80,3 +80,10 @@ cargo run --release -- lib/std/collections/vec.lang lib/std/mem.lang lib/std/uti
 ./target/a.out
 ```
 
+### String (`string.lang`)
+basic dynamic strings
+
+```bash
+cargo run --release -- examples/string.lang lib
+./target/a.out
+```
