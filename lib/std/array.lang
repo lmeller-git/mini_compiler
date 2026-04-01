@@ -36,7 +36,7 @@ end_def
 # returns the nth element of array x into to
 # arr is a ptr to an array, i.e. an array returned by function arr and n < len
 # Usage get array, n, &to;
-public begin_def get array, n, to;
+public begin_def arr_get array, n, to;
 	len = *(array - 8);
 	# crash if preconditions are violated
 	if !(n < len); panic "out of bounds access for array get";
@@ -46,7 +46,7 @@ end_def
 # sets the element at position at in arr to val
 # arr is a ptr to an array, i.e. an array returned by function arr and at < len
 # Usage: set array, at, val;
-public begin_def set array, at, val;
+public begin_def arr_set array, at, val;
 	len = *(array - 8);
 	# crash if preconditions are violated
 	if !(at < len); panic "out of bounds access for array set";

@@ -2,7 +2,7 @@ extern_def malloc size;
 extern_def c_call func, to, arg1, arg2, arg3, arg4;
 extern_def c_call_arr func, to, args;
 extern_def arr to, len;
-extern_def set array, at, with;
+extern_def arr_set array, at, with;
 extern_def print_arr array;
 
 public begin_def main argc, argv;
@@ -41,15 +41,15 @@ public begin_def main argc, argv;
 	arr &array, 9;
 	heap_location = 0;
 
-	set array, 0, &1;
-	set array, 1, &2;
-	set array, 2, &3;
-	set array, 3, &0;
-	set array, 4, &0;
-	set array, 5, &0;
-	set array, 6, &0;
-	set array, 7, &0;
-	set array, 8, &42;
+	arr_set array, 0, &1;
+	arr_set array, 1, &2;
+	arr_set array, 2, &3;
+	arr_set array, 3, &0;
+	arr_set array, 4, &0;
+	arr_set array, 5, &0;
+	arr_set array, 6, &0;
+	arr_set array, 7, &0;
+	arr_set array, 8, &42;
 
 	print_arr array;
 	print_str "\n";

@@ -72,11 +72,11 @@ cargo run --release -- examples/malloc.lang lib/std/array.lang lib/std/utils.lan
 ./target/a.out
 ```
 
-### Vector (`vec_test.lang`)
+### Vector (`vec.lang`)
 basic vector usage
 
 ```bash
-cargo run --release -- lib/std/collections/vec.lang lib/std/mem.lang lib/std/utils.lang examples/vec_test.lang lib/std/ffi.asm
+cargo run --release -- lib/std/collections/vec.lang lib/std/mem.lang lib/std/utils.lang examples/vec.lang lib/std/ffi.asm
 ./target/a.out
 ```
 

@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
-    fs::{self, File},
-    io::Read,
+    fs::{self, File, create_dir_all},
+    io::{self, Read},
     path::{Path, PathBuf},
     process::Command,
     sync::atomic::Ordering,
@@ -27,6 +27,9 @@ struct ParserImpl {
 
     #[arg(short, long, default_value_t = 1)]
     verbosity: u8,
+
+    #[arg(short, long, default_value_t = false)]
+    clean: bool,
 }
 
 fn main() {
@@ -78,15 +81,23 @@ fn main() {
             let asm_path = if ext == "asm" {
                 file
             } else {
-                &target_dir.join(format!("{}.asm", f_name))
+                &target_dir
+                    .join(file.parent().unwrap_or(Path::new(".")))
+                    .join(format!("{}.asm", f_name))
             };
             let obj_path = if ext == "o" {
                 file.clone()
             } else {
-                target_dir.join(format!("{}.o", f_name))
+                target_dir
+                    .join(file.parent().unwrap_or(Path::new(".")))
+                    .join(format!("{}.o", f_name))
             };
 
-            if ext != "asm" {
+            create_dir_all(obj_path.parent().unwrap()).unwrap();
+
+            let needs_recompile = args.clean || needs_recompile(file, &obj_path).unwrap();
+
+            if needs_recompile && ext != "asm" {
                 print_if!(1, "Compiling {}", file.display());
                 let mut s = String::new();
                 File::open(file).unwrap().read_to_string(&mut s).unwrap();
@@ -100,13 +111,15 @@ fn main() {
                 backend::asm_gen(code, asm_path).unwrap();
             }
 
-            print_if!(
-                1,
-                "Assembling {} to {}",
-                asm_path.display(),
-                obj_path.display()
-            );
-            assemble(asm_path, &obj_path);
+            if needs_recompile {
+                print_if!(
+                    1,
+                    "Assembling {} to {}",
+                    asm_path.display(),
+                    obj_path.display()
+                );
+                assemble(asm_path, &obj_path);
+            }
             obj_files.push(obj_path);
         }
     }
@@ -122,6 +135,20 @@ fn main() {
     link_with_gcc(&obj_files, &final_binary);
 
     print_if!(0, "Compiled files into: {}", final_binary.display());
+}
+
+fn needs_recompile(source: &Path, target_obj: &Path) -> Result<bool, io::Error> {
+    let obj_meta = match fs::metadata(target_obj) {
+        Ok(meta) => meta,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(true),
+        Err(e) => return Err(e),
+    };
+
+    let source_meta = fs::metadata(source)?;
+
+    let source_mtime = source_meta.modified()?;
+    let obj_mtime = obj_meta.modified()?;
+    Ok(obj_mtime < source_mtime)
 }
 
 fn assemble(asm_path: &Path, obj_path: &Path) {

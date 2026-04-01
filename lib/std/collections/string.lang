@@ -1,0 +1,12 @@
+extern_def panic;
+extern_def println;
+extern_def vec;
+extern_def vec_push;
+extern_def vec_pop;
+extern_def vec_insert;
+extern_def vec_remove;
+extern_def drop;
+
+
+public begin_def string to, cap;
+end_def
