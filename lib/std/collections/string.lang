@@ -7,6 +7,7 @@ extern_def vec_insert;
 extern_def vec_remove;
 extern_def drop;
 
-
+# Usage: string &to, cap;
 public begin_def string to, cap;
+	panic "todo";
 end_def

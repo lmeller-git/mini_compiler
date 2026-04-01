@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::{self, File, create_dir_all},
     io::{self, Read},
     path::{Path, PathBuf},
@@ -36,7 +36,7 @@ fn main() {
     let args = ParserImpl::parse();
     VERBOSITY.store(args.verbosity, Ordering::Relaxed);
 
-    let mut files: HashMap<String, Vec<PathBuf>> = HashMap::new();
+    let mut files: HashMap<String, HashSet<PathBuf>> = HashMap::new();
 
     for path in &args.inputs {
         if path.is_dir() {
@@ -46,8 +46,10 @@ fn main() {
         {
             files
                 .entry(ext.to_string())
-                .and_modify(|f| f.push(path.clone()))
-                .or_insert(vec![path.clone()]);
+                .and_modify(|f| {
+                    f.insert(path.clone());
+                })
+                .or_insert([path.clone()].into());
         } else {
             panic!("Input file not found: {}", path.display());
         }
@@ -182,7 +184,7 @@ fn link_with_gcc(obj_files: &[PathBuf], out_path: &Path) {
     assert!(status.success(), "gcc linking failed");
 }
 
-fn recursive_collect(dir: &Path, files: &mut HashMap<String, Vec<PathBuf>>) {
+fn recursive_collect(dir: &Path, files: &mut HashMap<String, HashSet<PathBuf>>) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -191,8 +193,10 @@ fn recursive_collect(dir: &Path, files: &mut HashMap<String, Vec<PathBuf>>) {
             {
                 files
                     .entry(ext.to_string())
-                    .and_modify(|f| f.push(path.clone()))
-                    .or_insert(vec![path.clone()]);
+                    .and_modify(|f| {
+                        f.insert(path.clone());
+                    })
+                    .or_insert([path.clone()].into());
             } else if path.is_dir() {
                 recursive_collect(&path, files);
             }

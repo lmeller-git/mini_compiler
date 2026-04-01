@@ -1,0 +1,11 @@
+extern_def panic;
+extern_def println;
+extern_def call_calloc;
+extern_def call_free;
+extern_def call_memcpy;
+extern_def call_realloc;
+
+# Usage: linked_list &to;
+public begin_def linked_list to;
+	panic "todo";
+end_def
