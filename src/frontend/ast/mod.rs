@@ -81,7 +81,7 @@ pub(crate) fn is_func(funcs: &IndexMap<String, Function>, ident: &str) -> bool {
 pub(crate) fn is_builtin_func(ident: &str) -> bool {
     matches!(
         ident,
-        "print_str" | "print" | "exit" | "goto" | "label" | "sqrt" | "addr_of"
+        "print_str" | "print" | "exit" | "goto" | "label" | "addr_of" | "asm"
     )
 }
 

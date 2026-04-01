@@ -244,33 +244,7 @@ impl AsmWriter {
             "addr_of" => self.builtin_addr_of(args, vars, temps),
             "goto" => self.write_in_fn(format_args!("jmp {}", args[0])),
             "label" => writeln!(self.fh, "{}:", args[0]).unwrap(),
-            "sqrt" => {
-                // assuming we get a ptr to some integer value
-                // result is written back to pointer
-                let rcx_usage = USAGE[Reg::RCX as usize].load(Ordering::Relaxed);
-                if rcx_usage {
-                    self.write_in_fn(format_args!("push rcx"));
-                    temps.inc_stack(8);
-                }
-
-                self.write_in_fn(format_args!(
-                    "mov rcx, {}",
-                    self.get_var_str(&args[0], vars, temps)
-                ));
-                self.write_in_fn(format_args!("mov rax, [rcx]"));
-
-                self.write_in_fn(format_args!("cvtsi2sd xmm0, rax"));
-                self.write_in_fn(format_args!("sqrtsd xmm0, xmm0"));
-                self.write_in_fn(format_args!("cvttsd2si rax, xmm0"));
-
-                self.write_in_fn(format_args!("mov [rcx], rax"));
-
-                if rcx_usage {
-                    self.write_in_fn(format_args!("pop rcx"));
-                    temps.dec_stack(8);
-                }
-            }
-
+            "asm" => self.write_in_fn(format_args!("{}", args[0])),
             _ => {}
         }
     }

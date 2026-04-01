@@ -242,6 +242,14 @@ impl CodeBuilder {
 
                 vec![Operand::Variable(ident), self.lower_unit(to)]
             }
+            "asm" => {
+                // we expect on argument, which is a string literal (or an ident?). we will emit this again as Variable/Ident.
+                debug_assert_eq!(exprs.len(), 1);
+                let (Expr::Val(Val::Var(lit)) | Expr::Val(Val::Lit(lit))) = &exprs[0] else {
+                    panic!("cannot interpret non string literals/idents as assembly");
+                };
+                vec![Operand::Variable(lit.to_string())]
+            }
             _ => exprs.iter().map(|e| self.lower_unit(e)).collect(),
         }
     }

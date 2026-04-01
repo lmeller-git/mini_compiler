@@ -94,7 +94,6 @@ The current supported builtin functions are
 - exit
 - label
 - goto
-- sqrt
 - addr_of
 
 ## Supported targets
