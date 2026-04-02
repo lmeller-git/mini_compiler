@@ -124,10 +124,79 @@ begin_def __insert_between prev, next, value;
 	*prev = *prev ^ next ^ node;
 end_def
 
+begin_def __get_node list, at, to;
+	if !(*(list + 16) > at); __bound_violation *(list + 16), at, "in __get_node";
+	prev = 0;
+	i = 0;
+	if (*_len_bytes / 2) < at; goto greater;
+	next = *list;
+	goto walk;
+	label greater;
+	next = *(list + 8);
+	at = *(list + 16) - at;
+
+	label walk;
+	current = *next ^ prev;
+	prev = next;
+	next = current;
+	if at == i; goto exit;
+	label exit;
+	*to = next;
+end_def
+
 begin_def insert list, at, value;
+	_len_bytes = list + 16;
+	if *_len_bytes < at; __bound_violation *_len_bytes, at, "in insert";
+	if *_len_bytes == at; goto tail;
+	if !at; goto front;
+
+	node = 0;
+	allocate_node &node;
+	payload = node + 8;
+	*payload = value;
+	prev = 0;
+	if (*_len_bytes / 2) < at; goto greater;
+	next = *list;
+	goto walk_list;
+	label greater;
+	next = *(list + 8);
+
+	label walk_list;
+
+	goto walk_list;
+
+	*node = prev ^ next;
+	*next = *next ^ prev ^ node;
+	*prev = *prev ^ next ^ node;
+	*_len_bytes = *_len_bytes + 1;
+	goto exit;
+
+	label front;
+	push_front list, value;
+	goto exit;
+	label tail;
+	push_tail list, value;
+
+	label exit;
 end_def
 
 begin_def remove list, at, to;
+	_len_bytes = list + 16;
+	if !(*_len_bytes > at); __bound_violation *_len_bytes, at, "in remove";
+	if *_len_bytes == at + 1; goto tail;
+	if !at; goto front;
+
+	node = 0;
+
+
+	goto exit;
+	label tail;
+	pop_tail list, to;
+	goto exit;
+	label front;
+	pop_front list, to;
+
+	label exit;
 end_def
 
 begin_def print_ll list;
