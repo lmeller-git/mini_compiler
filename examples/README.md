@@ -87,3 +87,26 @@ basic dynamic strings
 cargo run --release -- examples/string.lang lib
 ./target/a.out
 ```
+
+### Linked List (`linked_list.lang`)
+basic linked_list usage
+
+```bash
+cargo run --release -- examples/linked_list.lang lib
+./target/a.out
+```
+
+### Test (`test.lang`)
+defining and running tests
+
+```bash
+cargo run --release -- examples/test.lang lib --test
+./target/a.out
+```
+
+Of course this may also be run as a normal executable:
+
+```bash
+cargo run --release -- examples/test.lang lib
+./target/a.out
+```

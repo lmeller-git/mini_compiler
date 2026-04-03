@@ -39,6 +39,8 @@ To link against the std library simply include `<path to mini_compiler_repo>/lib
 
 To call functions via FFI, use `c_call` or `c_call_arr` in `lib/std/ffi.asm`
 
+Run tests easily with `cargo run --release -- <files> --test`
+
 ## Syntax
 
 Declare a variable with:
@@ -84,6 +86,30 @@ Valid exprs use basic math operators, parentheses, strlits and pointer derefs/re
 
 ```(<expr> + <expr>) - (<expr> + <expr>);```
 
+
+Inline assembly may be written with
+
+```
+ asm "
+ <asm here>
+ ";
+```
+
+Linker attributes for functions may be defined with
+
+```
+ link_attr <attribute1>;
+ link_attr <attribute2>;
+ <function def / extern def>
+```
+
+Linker section test_array is used for test functions, i.e. functions annotated with
+
+```
+ link_attr section test_array;
+```
+
+will be run in a test run.
 
 ## Builtin functions
 
