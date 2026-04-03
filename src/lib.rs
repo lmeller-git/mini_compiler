@@ -1,3 +1,5 @@
+#![feature(if_let_guard)]
+
 use std::sync::atomic::AtomicU8;
 
 pub mod backend;
