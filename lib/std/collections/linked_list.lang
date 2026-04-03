@@ -19,11 +19,11 @@ public begin_def allocate_node to;
 end_def
 
 # Usage: ll_len list, &to;
-begin_def ll_len list, to;
+public begin_def ll_len list, to;
 	*to = *(list + 16);
 end_def
 
-begin_def __bound_violation, len, idx, msg;
+begin_def __bound_violation len, idx, msg;
 	print_str "linked list bound violation:\nthe len is: ";
 	print len;
 	print_str " but the index is: ";
@@ -31,8 +31,12 @@ begin_def __bound_violation, len, idx, msg;
 	panic msg;
 end_def
 
+public begin_def ll_drop_node node;
+	call_free node;
+end_def
+
 # Usage: push_front list, value;
-begin_def push_front list, value;
+public begin_def push_front list, value;
 	_len_bytes = list + 16;
 	node = 0;
 	allocate_node &node;
@@ -57,7 +61,7 @@ begin_def push_front list, value;
 end_def
 
 # Usage: push_tail list, value;
-begin_def push_tail list, value;
+public begin_def push_tail list, value;
 	_len_bytes = list + 16;
 	node = 0;
 	allocate_node &node;
@@ -82,14 +86,14 @@ begin_def push_tail list, value;
 	*_len_bytes = *_len_bytes + 1;
 end_def
 
-begin_def pop_front list, to;
+public begin_def pop_front list, to;
 	_len_bytes = list + 16;
 	if *_len_bytes; goto non_empty;
 	*to = 0;
 	goto exit;
 
 	label non_empty;
-	if *_len_bytes == 1; goto one;i
+	if *_len_bytes == 1; goto one;
 	# list -> head -> next
 	# _ -> 0 ^ next -> prev ^ next
 	old_head = *list;
@@ -106,12 +110,39 @@ begin_def pop_front list, to;
 	*list = 0;
 	end = list + 8;
 	*end = 0;
-	*_len_bytes = *_len_bytes - 1;
+	*_len_bytes = 0;
 
 	label exit;
 end_def
 
-begin_def pop_tail list, to;
+public begin_def pop_tail list, to;
+	_len_bytes = list + 16;
+	if *_len_bytes; goto non_empty;
+	*to = 0;
+	goto exit;
+
+	label non_empty;
+	if *_len_bytes == 1; goto one;
+	# list -> head -> next
+	# _ -> 0 ^ next -> prev ^ next
+	old_tail = list + 8;
+	old_tail_node = *old_tail;
+	*to = *(*old_tail + 8);
+	***old_tail = ***old_tail ^ *old_tail;
+	*old_tail = **old_tail;
+	*_len_bytes = *_len_bytes - 1;
+	ll_drop_node old_tail_node;
+	goto exit;
+
+	label one;
+	*to = *(*(list + 8) + 8);
+	ll_drop_node *(list + 8);
+	*list = 0;
+	end = list + 8;
+	*end = 0;
+	*_len_bytes = 0;
+
+	label exit;
 end_def
 
 begin_def __insert_between prev, next, value;
@@ -124,50 +155,48 @@ begin_def __insert_between prev, next, value;
 	*prev = *prev ^ next ^ node;
 end_def
 
-begin_def __get_node list, at, to;
+begin_def __get_node_pair list, at, prev_node, next_node;
 	if !(*(list + 16) > at); __bound_violation *(list + 16), at, "in __get_node";
 	prev = 0;
 	i = 0;
-	if (*_len_bytes / 2) < at; goto greater;
+	if (*(list + 16) / 2) < at; goto greater;
 	next = *list;
 	goto walk;
 	label greater;
 	next = *(list + 8);
-	at = *(list + 16) - at;
+	at = *(list + 16) - at + 1;
 
 	label walk;
+	if at == i + 1; goto exit;
 	current = *next ^ prev;
 	prev = next;
 	next = current;
-	if at == i; goto exit;
+	i = i + 1;
+	goto walk;
+
 	label exit;
-	*to = next;
+	*next_node = next;
+	*prev_node = *next ^ prev;
 end_def
 
-begin_def insert list, at, value;
+public begin_def insert list, at, value;
 	_len_bytes = list + 16;
 	if *_len_bytes < at; __bound_violation *_len_bytes, at, "in insert";
-	if *_len_bytes == at; goto tail;
 	if !at; goto front;
+	if *_len_bytes == at; goto tail;
 
 	node = 0;
 	allocate_node &node;
 	payload = node + 8;
 	*payload = value;
+
 	prev = 0;
-	if (*_len_bytes / 2) < at; goto greater;
-	next = *list;
-	goto walk_list;
-	label greater;
-	next = *(list + 8);
+	current = 0;
+	__get_node_pair list, at, &prev, &current;
 
-	label walk_list;
-
-	goto walk_list;
-
-	*node = prev ^ next;
-	*next = *next ^ prev ^ node;
-	*prev = *prev ^ next ^ node;
+	*node = prev ^ current;
+	*prev = *prev ^ current ^ node;
+	*current = *current ^ prev ^ node;
 	*_len_bytes = *_len_bytes + 1;
 	goto exit;
 
@@ -180,16 +209,28 @@ begin_def insert list, at, value;
 	label exit;
 end_def
 
-begin_def remove list, at, to;
+extern_def println;
+
+public begin_def remove list, at, to;
 	_len_bytes = list + 16;
 	if !(*_len_bytes > at); __bound_violation *_len_bytes, at, "in remove";
-	if *_len_bytes == at + 1; goto tail;
 	if !at; goto front;
+	if *_len_bytes == at + 1; goto tail;
 
 	node = 0;
+	prev = 0;
+	__get_node_pair list, at + 1, &prev, &node;
+
+	next = *node ^ prev;
+	*prev = *prev ^ node ^ next;
+	*next = *next ^ node ^ prev;
 
 
+	*to = *(node + 8);
+	ll_drop_node node;
+	*_len_bytes = *_len_bytes - 1;
 	goto exit;
+
 	label tail;
 	pop_tail list, to;
 	goto exit;
@@ -199,12 +240,24 @@ begin_def remove list, at, to;
 	label exit;
 end_def
 
-begin_def print_ll list;
+public begin_def print_ll list;
+	print_str "[ ";
+	next = *list;
+	prev = 0;
+
+	label walk;
+	if !next; goto exit;
+	if prev; print_str " , ";
+	print *(next + 8);
+	current = *next ^ prev;
+	prev = next;
+	next = current;
+	goto walk;
+
+	label exit;
+	print_str " ]";
+
 end_def
 
-begin_def ll_drop_node node;
-	call_free node;
-end_def
-
-begin_def ll_drop_list list;
+public begin_def ll_drop_list list;
 end_def
