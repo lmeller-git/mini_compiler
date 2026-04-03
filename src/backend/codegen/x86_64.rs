@@ -20,7 +20,7 @@ pub struct AsmWriter {
 }
 
 impl AsmWriter {
-    pub fn new(path: &Path, code: &ProgramIR) -> Self {
+    pub fn new(path: &Path, _code: &ProgramIR) -> Self {
         let mut file = File::create(path).unwrap();
         print_if!(1, "writing asm code to {}", path.display());
 
@@ -30,20 +30,7 @@ impl AsmWriter {
         )
         .unwrap();
 
-        for (payload, ident) in code.functions.values().flat_map(|f| f.body.data.iter()) {
-            writeln!(file, "\t{}: db `{}`, 0", ident, payload.write_data()).unwrap();
-        }
-
-        writeln!(file, "\nsection .text\n\textern printf\n\textern exit").unwrap();
-        for extern_func in code.external.keys() {
-            writeln!(file, "\textern {}", extern_func).unwrap();
-        }
-        for (name, func) in code.functions.iter() {
-            if func.is_public {
-                writeln!(file, "\tglobal {}", name).unwrap();
-            }
-        }
-        writeln!(file).unwrap();
+        writeln!(file, "\nsection .text\n\textern printf\n\textern exit\n").unwrap();
 
         Self { fh: file }
     }
@@ -53,6 +40,23 @@ impl AsmWriter {
         let mut temps = TempVarStack::default();
         for (name, func) in code.functions.iter() {
             let stack_size_at_last_cleanup = temps.stack_pushes; // 0
+            // TODO deduplicate the emitted section data
+            if !func.body.data.is_empty() {
+                writeln!(self.fh, "section .data").unwrap();
+                for (payload, ident) in func.body.data.iter() {
+                    writeln!(self.fh, "\t{}: db `{}`, 0", ident, payload.write_data()).unwrap();
+                }
+            }
+
+            writeln!(self.fh, "section {}", func.section).unwrap();
+            if func.is_public {
+                writeln!(self.fh, "global {}", name).unwrap();
+            }
+
+            if func.external {
+                writeln!(self.fh, "extern {}", name).unwrap();
+                continue;
+            }
 
             writeln!(self.fh, "{}:", name).unwrap();
             for (arg, reg) in func.args.iter().zip(CALL_ORDER) {

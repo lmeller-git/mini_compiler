@@ -260,4 +260,17 @@ public begin_def print_ll list;
 end_def
 
 public begin_def ll_drop_list list;
+	next = *list;
+	prev = 0;
+
+	label walk;
+	if !next; goto exit;
+	current = *next ^ prev;
+	prev = next;
+	next = current;
+	ll_drop_node prev;
+	goto walk;
+
+	label exit;
+	call_free list;
 end_def

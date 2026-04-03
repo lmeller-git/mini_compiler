@@ -1,6 +1,13 @@
 use std::fmt::Display;
 
-static KEYWORDS: &[&str] = &["if", "begin_def", "end_def", "extern_def", "public"];
+static KEYWORDS: &[&str] = &[
+    "if",
+    "begin_def",
+    "end_def",
+    "extern_def",
+    "public",
+    "link_attr",
+];
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, PartialEq, Eq)]

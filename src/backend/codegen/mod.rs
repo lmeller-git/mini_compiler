@@ -8,57 +8,40 @@ pub mod x86_64;
 #[derive(Debug)]
 pub struct ProgramIR {
     pub functions: indexmap::IndexMap<String, FunctionIR>,
-    pub external: indexmap::IndexMap<String, FunctionIR>,
 }
 
 impl ProgramIR {
     pub fn build(ast: &Ast) -> Self {
         let mut functions = IndexMap::new();
-        let mut external = IndexMap::new();
         let mut builder = CodeBuilder::new();
         for func in ast.funcs() {
-            if let Some(func_body) = func.body() {
-                functions.insert(
-                    func.name.clone(),
-                    FunctionIR {
-                        body: builder.build(func_body, func.name.clone()),
-                        name: func.name.clone(),
-                        args: func
-                            .args
-                            .clone()
-                            .into_iter()
-                            .map(|mut arg| {
-                                builder.rename_ident(&mut arg);
-                                arg
-                            })
-                            .collect(),
-                        is_public: func.is_public,
-                    },
-                );
+            let code = if let Some(func_body) = func.body() {
+                builder.build(func_body, func.name.clone())
             } else {
-                external.insert_full(
-                    func.name.clone(),
-                    FunctionIR {
-                        name: func.name.clone(),
-                        args: func
-                            .args
-                            .clone()
-                            .into_iter()
-                            .map(|mut arg| {
-                                builder.rename_ident(&mut arg);
-                                arg
-                            })
-                            .collect(),
-                        body: CodeTree::default(),
-                        is_public: func.is_public,
-                    },
-                );
-            }
+                CodeTree::default()
+            };
+
+            functions.insert(
+                func.name.clone(),
+                FunctionIR {
+                    body: code,
+                    name: func.name.clone(),
+                    args: func
+                        .args
+                        .clone()
+                        .into_iter()
+                        .map(|mut arg| {
+                            builder.rename_ident(&mut arg);
+                            arg
+                        })
+                        .collect(),
+                    is_public: func.is_public,
+                    section: func.section.clone(),
+                    external: func.external,
+                },
+            );
         }
-        Self {
-            functions,
-            external,
-        }
+        Self { functions }
     }
 }
 
@@ -68,6 +51,8 @@ pub struct FunctionIR {
     pub args: Vec<String>,
     pub body: CodeTree,
     pub is_public: bool,
+    pub section: String,
+    pub external: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]

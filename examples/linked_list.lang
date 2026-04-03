@@ -79,31 +79,3 @@ public begin_def main;
     println length;
 
 end_def
-
-
-begin_def _main;
-	ll = 0;
-	linked_list &ll;
-
-	print_ll ll;
-	print_str "\n";
-
-	push_tail ll, 42;
-	print_ll ll;
-	print_str "\n";
-
-	push_tail ll, 100;
-	print_ll ll;
-	print_str "\n";
-
-	to = 0;
-
-	pop_front ll, &to;
-	println to;
-	print_ll ll;
-	print_str "\n";
-	pop_front ll, &to;
-	println to;
-	print_ll ll;
-	print_str "\n";
-end_def
