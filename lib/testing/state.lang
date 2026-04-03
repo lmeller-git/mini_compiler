@@ -1,0 +1,26 @@
+link_attr raw section __test_flag;
+begin_def __static_test_failed;
+end_def
+
+public begin_def _test_state_set_failed;
+	asm "
+	lea rax, [rel __static_test_failed_ptr]
+    mov qword [rax], 1
+	";
+end_def
+
+public begin_def _test_state_reset_flag;
+	asm "
+	lea rax, [rel __static_test_failed_ptr]
+    mov qword [rax], 0
+	";
+end_def
+
+public begin_def _test_state_read_flag to;
+	asm "
+	lea rax, [rel __static_test_failed_ptr]
+    mov rax, [rax]
+    mov r8, [___test_state_read_flag_var_to]
+    mov [r8], rax
+	";
+end_def

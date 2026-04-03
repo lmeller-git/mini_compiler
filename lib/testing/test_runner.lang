@@ -1,7 +1,15 @@
 extern_def println;
-
+extern_def _test_state_read_flag;
+extern_def _test_state_reset_flag;
+extern_def _test_state_set_failed;
 extern_def __start_test_array;
 extern_def __stop_test_array;
+extern_def test_assert;
+
+link_attr section test_array;
+begin_def health;
+	test_assert 1;
+end_def
 
 public begin_def __wrap_main;
 	start = 0;
@@ -15,8 +23,13 @@ public begin_def __wrap_main;
 	n_tests = (end - start) / 8;
 
 	i = 0;
+	failed = 0;
+
 	label test_loop;
 	if start == end; goto end_loop;
+
+	_test_state_reset_flag;
+
 	print_str "Running test ";
 	print i + 1;
 	print_str "/";
@@ -33,7 +46,18 @@ public begin_def __wrap_main;
 	mov rax, [rax + 8]
 	call rax
 	";
-	print_str " [OK]\n";
+
+	_test_state_read_flag &failed;
+
+	if failed; goto failed_print;
+
+	print_str "\t\x1b[32m[OK]\x1b[0m\n";
+	goto test_done;
+
+	label failed_print;
+	print_str "\t\x1b[31m[ERR]\x1b[0m\n ";
+
+	label test_done;
 	start = start + 8;
 	i = i + 1;
 	goto test_loop;

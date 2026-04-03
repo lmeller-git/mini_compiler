@@ -1,4 +1,6 @@
 extern_def println;
+extern_def test_assert;
+extern_def test_assert_eq;
 
 begin_def add x, y, to;
 	*to = x + y;
@@ -10,11 +12,10 @@ public begin_def test_add;
 	to = 0;
 
 	add 1, 2, &to;
-	if !(to == 3); *0;
+	test_assert_eq to, 3;
 
 	add 21, 21, &to;
-
-	if !(to == 42); *0;
+	test_assert_eq to, 42;
 
 end_def
 
@@ -23,11 +24,16 @@ public begin_def test_add2;
 	to = 0;
 
 	add 0, 3, &to;
-	if !(to == 3); *0;
+	test_assert_eq to, 3;
 
 	add 20, 22, &to;
+	test_assert_eq to, 42;
 
-	if !(to == 42); *0;
+end_def
+
+link_attr section test_array;
+begin_def failure;
+	test_assert_eq 1, 2;
 end_def
 
 

@@ -58,7 +58,8 @@ impl AsmWriter {
             match meta {
                 LinkMeta::Raw => {
                     if section != ".text" {
-                        writeln!(self.fh, "section {}", section).unwrap();
+                        writeln!(self.fh, "section {} progbits alloc write", section).unwrap();
+                        writeln!(self.fh, "{}_ptr:", name).unwrap();
                         writeln!(self.fh, "\tdq {}", name).unwrap();
                     }
                 }
@@ -79,7 +80,7 @@ impl AsmWriter {
                         writeln!(self.fh, "\tdq __meta_str_{}", name).unwrap();
 
                         // ptr to meta block in section <section>
-                        writeln!(self.fh, "section {}", section).unwrap();
+                        writeln!(self.fh, "section {} progbits alloc write", section).unwrap();
                         writeln!(self.fh, "\tdq __meta_{}", name).unwrap();
                     }
                 }

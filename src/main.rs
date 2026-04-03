@@ -77,15 +77,8 @@ fn main() {
     let mut obj_files = Vec::new();
 
     if args.test {
-        let test_runner = &format!("{}/lib/test_runner.lang", repo_root);
-        println!("{}", test_runner);
-
-        files
-            .entry("lang".to_string())
-            .and_modify(|f| {
-                f.insert(test_runner.into());
-            })
-            .or_insert([test_runner.into()].into());
+        let test_lib: PathBuf = format!("{}/lib/testing", repo_root).into();
+        recursive_collect(&test_lib, &mut files);
     }
 
     print_if!(1, "compiling {} files...", files.len());
