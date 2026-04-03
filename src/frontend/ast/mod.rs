@@ -127,24 +127,20 @@ impl LinkAttr {
         let mut zelf = Self::default();
         while let Token::Keyword("link_attr") = stream.peek() {
             stream.advance();
-            match stream.peek() {
-                Token::Ident("section") if let Token::Ident(sec) = stream.peekn(1) => {
+            match (stream.peekn(0), stream.peekn(1), stream.peekn(2)) {
+                (Token::Ident("section"), Token::Ident(sec), _) => {
                     zelf = zelf.with_section(sec.to_string());
                     stream.advance();
                     stream.advance();
                 }
-                Token::Ident("raw")
-                    if let Token::Ident("section") = stream.peekn(1)
-                        && let Token::Ident(sec) = stream.peekn(2) =>
-                {
-                    zelf = zelf.with_meta(LinkMeta::Raw);
-                    zelf = zelf.with_section(sec.to_string());
+                (Token::Ident("raw"), Token::Ident("section"), Token::Ident(sec)) => {
+                    zelf = zelf.with_meta(LinkMeta::Raw).with_section(sec.to_string());
                     stream.advance();
                     stream.advance();
                     stream.advance();
                 }
-                Token::Ident("vis") => {
-                    match stream.peekn(1) {
+                (Token::Ident("vis"), next, _) => {
+                    match next {
                         Token::Ident("public") => zelf = zelf.into_pub(),
                         Token::Ident("private") => zelf.is_public = false,
                         tok => return Err(AstErr::BadToken(tok.to_string())),
@@ -152,12 +148,13 @@ impl LinkAttr {
                     stream.advance();
                     stream.advance();
                 }
-                Token::Ident("extern") => {
+                (Token::Ident("extern"), _, _) => {
                     zelf = zelf.into_external();
                     stream.advance();
                 }
-                tok => return Err(AstErr::BadToken(tok.to_string())),
+                (tok, _, _) => return Err(AstErr::BadToken(tok.to_string())),
             }
+
             let _tok = stream.peek();
             let Token::Semi = _tok else {
                 return Err(AstErr::BadToken(_tok.to_string()));
