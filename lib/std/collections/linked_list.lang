@@ -5,7 +5,206 @@ extern_def call_free;
 extern_def call_memcpy;
 extern_def call_realloc;
 
+# Linked list over nodes {next^prev, payload} with List {head, tail, len}
+# A list is a ptr to some heap allocated List
+
 # Usage: linked_list &to;
 public begin_def linked_list to;
-	panic "todo";
+	call_calloc to, 3, 8;
+end_def
+
+# Usage: allocate_node &to;
+public begin_def allocate_node to;
+	call_calloc to, 2, 8;
+end_def
+
+# Usage: ll_len list, &to;
+begin_def ll_len list, to;
+	*to = *(list + 16);
+end_def
+
+begin_def __bound_violation, len, idx, msg;
+	print_str "linked list bound violation:\nthe len is: ";
+	print len;
+	print_str " but the index is: ";
+	println idx;
+	panic msg;
+end_def
+
+# Usage: push_front list, value;
+begin_def push_front list, value;
+	_len_bytes = list + 16;
+	node = 0;
+	allocate_node &node;
+	payload = node + 8;
+	*payload = value;
+
+	if !*_len_bytes; goto empty;
+
+	# non empty
+	**list = **list ^ node;
+	*node = *list;
+	*list = node;
+	goto exit;
+
+	label empty;
+	*list = node;
+	tail = list + 8;
+	*tail = node;
+
+	label exit;
+	*_len_bytes = *_len_bytes + 1;
+end_def
+
+# Usage: push_tail list, value;
+begin_def push_tail list, value;
+	_len_bytes = list + 16;
+	node = 0;
+	allocate_node &node;
+	payload = node + 8;
+	*payload = value;
+
+	if !*_len_bytes; goto empty;
+
+	# non empty
+	tail_ptr = list + 8;
+	**tail_ptr = **tail_ptr ^ node;
+	*node = *tail_ptr;
+	*tail_ptr = node;
+	goto exit;
+
+	label empty;
+	*list = node;
+	tail = list + 8;
+	*tail = node;
+
+	label exit;
+	*_len_bytes = *_len_bytes + 1;
+end_def
+
+begin_def pop_front list, to;
+	_len_bytes = list + 16;
+	if *_len_bytes; goto non_empty;
+	*to = 0;
+	goto exit;
+
+	label non_empty;
+	if *_len_bytes == 1; goto one;i
+	# list -> head -> next
+	# _ -> 0 ^ next -> prev ^ next
+	old_head = *list;
+	*to = *(old_head + 8);
+	***list = ***list ^ old_head;
+	*list = **list;
+	*_len_bytes = *_len_bytes - 1;
+	ll_drop_node old_head;
+	goto exit;
+
+	label one;
+	*to = *(*list + 8);
+	ll_drop_node *list;
+	*list = 0;
+	end = list + 8;
+	*end = 0;
+	*_len_bytes = *_len_bytes - 1;
+
+	label exit;
+end_def
+
+begin_def pop_tail list, to;
+end_def
+
+begin_def __insert_between prev, next, value;
+	node = 0;
+	allocate_node &node;
+	*node = prev ^ next;
+	payload = node + 8;
+	*payload = value;
+	*next = *next ^ prev ^ node;
+	*prev = *prev ^ next ^ node;
+end_def
+
+begin_def __get_node list, at, to;
+	if !(*(list + 16) > at); __bound_violation *(list + 16), at, "in __get_node";
+	prev = 0;
+	i = 0;
+	if (*_len_bytes / 2) < at; goto greater;
+	next = *list;
+	goto walk;
+	label greater;
+	next = *(list + 8);
+	at = *(list + 16) - at;
+
+	label walk;
+	current = *next ^ prev;
+	prev = next;
+	next = current;
+	if at == i; goto exit;
+	label exit;
+	*to = next;
+end_def
+
+begin_def insert list, at, value;
+	_len_bytes = list + 16;
+	if *_len_bytes < at; __bound_violation *_len_bytes, at, "in insert";
+	if *_len_bytes == at; goto tail;
+	if !at; goto front;
+
+	node = 0;
+	allocate_node &node;
+	payload = node + 8;
+	*payload = value;
+	prev = 0;
+	if (*_len_bytes / 2) < at; goto greater;
+	next = *list;
+	goto walk_list;
+	label greater;
+	next = *(list + 8);
+
+	label walk_list;
+
+	goto walk_list;
+
+	*node = prev ^ next;
+	*next = *next ^ prev ^ node;
+	*prev = *prev ^ next ^ node;
+	*_len_bytes = *_len_bytes + 1;
+	goto exit;
+
+	label front;
+	push_front list, value;
+	goto exit;
+	label tail;
+	push_tail list, value;
+
+	label exit;
+end_def
+
+begin_def remove list, at, to;
+	_len_bytes = list + 16;
+	if !(*_len_bytes > at); __bound_violation *_len_bytes, at, "in remove";
+	if *_len_bytes == at + 1; goto tail;
+	if !at; goto front;
+
+	node = 0;
+
+
+	goto exit;
+	label tail;
+	pop_tail list, to;
+	goto exit;
+	label front;
+	pop_front list, to;
+
+	label exit;
+end_def
+
+begin_def print_ll list;
+end_def
+
+begin_def ll_drop_node node;
+	call_free node;
+end_def
+
+begin_def ll_drop_list list;
 end_def
