@@ -9,7 +9,7 @@ use std::{
 
 use crate::{
     backend::codegen::{LValue, ProgramIR},
-    frontend::ast::{Operation, is_builtin_func},
+    frontend::ast::{LinkAttr, LinkMeta, Operation, is_builtin_func},
     print_if,
 };
 
@@ -48,12 +48,49 @@ impl AsmWriter {
                 }
             }
 
-            writeln!(self.fh, "section {}", func.section).unwrap();
-            if func.is_public {
+            let LinkAttr {
+                section,
+                external,
+                is_public,
+                meta,
+            } = &func.link_attr;
+
+            match meta {
+                LinkMeta::Raw => {
+                    if section != ".text" {
+                        writeln!(self.fh, "section {}", section).unwrap();
+                        writeln!(self.fh, "\tdq {}", name).unwrap();
+                    }
+                }
+                LinkMeta::WithMeta => {
+                    if section != ".text" {
+                        writeln!(self.fh, "section .rodata").unwrap();
+
+                        // emit a block of metadata. this contains the len (in bytes)
+                        // currently it is always of length sizeof(len) == 8 + 8 + 8 = 24 bytes
+                        // and is defined as len|func_ptr|str
+                        let len = "24";
+
+                        writeln!(self.fh, "__meta_str_{}: db \"{}\", 0", name, name).unwrap();
+
+                        writeln!(self.fh, "__meta_{}:", name).unwrap();
+                        writeln!(self.fh, "\tdq {}", len).unwrap();
+                        writeln!(self.fh, "\tdq {}", name).unwrap();
+                        writeln!(self.fh, "\tdq __meta_str_{}", name).unwrap();
+
+                        // ptr to meta block in section <section>
+                        writeln!(self.fh, "section {}", section).unwrap();
+                        writeln!(self.fh, "\tdq __meta_{}", name).unwrap();
+                    }
+                }
+            }
+
+            writeln!(self.fh, "section .text").unwrap();
+            if *is_public {
                 writeln!(self.fh, "global {}", name).unwrap();
             }
 
-            if func.external {
+            if *external {
                 writeln!(self.fh, "extern {}", name).unwrap();
                 continue;
             }

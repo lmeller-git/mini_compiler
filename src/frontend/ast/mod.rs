@@ -93,22 +93,11 @@ impl Ast {
     pub fn from_stream(s: &mut TokenStream) -> Self {
         let mut functions = IndexMap::new();
         loop {
-            let section = match s.peek() {
-                Token::Keyword("link_attr")
-                    if let Token::Ident("section") = s.peekn(1)
-                        && let Token::Ident(sec) = s.peekn(2)
-                        && let Token::Semi = s.peekn(3) =>
-                {
-                    let section = sec.to_string();
-                    s.advance();
-                    s.advance();
-                    s.advance();
-                    s.advance();
-                    section
-                }
-                _ => ".text".into(),
+            let link_attr = match s.peek() {
+                Token::Keyword("link_attr") => LinkAttr::parse(s).unwrap(),
+                _ => LinkAttr::default(),
             };
-            match Function::parse(&functions, s, section) {
+            match Function::parse(&functions, s, link_attr) {
                 Ok(func) => _ = functions.insert(func.name.clone(), func),
                 Err(AstErr::Eof) => break,
                 Err(e) => panic!("err in parse: {:#?}", e),
@@ -125,20 +114,111 @@ impl Ast {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct LinkAttr {
+    pub section: String,
+    pub external: bool,
+    pub is_public: bool,
+    pub meta: LinkMeta,
+}
+
+impl LinkAttr {
+    fn parse(stream: &mut TokenStream) -> Result<Self, AstErr> {
+        let mut zelf = Self::default();
+        while let Token::Keyword("link_attr") = stream.peek() {
+            stream.advance();
+            match stream.peek() {
+                Token::Ident("section") if let Token::Ident(sec) = stream.peekn(1) => {
+                    zelf = zelf.with_section(sec.to_string());
+                    stream.advance();
+                    stream.advance();
+                }
+                Token::Ident("raw")
+                    if let Token::Ident("section") = stream.peekn(1)
+                        && let Token::Ident(sec) = stream.peekn(2) =>
+                {
+                    zelf = zelf.with_meta(LinkMeta::Raw);
+                    zelf = zelf.with_section(sec.to_string());
+                    stream.advance();
+                    stream.advance();
+                    stream.advance();
+                }
+                Token::Ident("vis") => {
+                    match stream.peekn(1) {
+                        Token::Ident("public") => zelf = zelf.into_pub(),
+                        Token::Ident("private") => zelf.is_public = false,
+                        tok => return Err(AstErr::BadToken(tok.to_string())),
+                    }
+                    stream.advance();
+                    stream.advance();
+                }
+                Token::Ident("extern") => {
+                    zelf = zelf.into_external();
+                    stream.advance();
+                }
+                tok => return Err(AstErr::BadToken(tok.to_string())),
+            }
+            let _tok = stream.peek();
+            let Token::Semi = _tok else {
+                return Err(AstErr::BadToken(_tok.to_string()));
+            };
+            stream.advance();
+        }
+
+        Ok(zelf)
+    }
+
+    fn into_external(mut self) -> Self {
+        self.external = true;
+        self
+    }
+
+    fn into_pub(mut self) -> Self {
+        self.is_public = true;
+        self
+    }
+
+    fn with_section(mut self, section: String) -> Self {
+        self.section = section;
+        self
+    }
+
+    fn with_meta(mut self, meta: LinkMeta) -> Self {
+        self.meta = meta;
+        self
+    }
+}
+
+impl Default for LinkAttr {
+    fn default() -> Self {
+        Self {
+            section: ".text".into(),
+            external: false,
+            is_public: false,
+            meta: LinkMeta::default(),
+        }
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub enum LinkMeta {
+    Raw,
+    #[default]
+    WithMeta,
+}
+#[derive(Debug)]
 pub struct Function {
     pub name: String,
     pub body: Option<Vec<Line>>,
     pub args: Vec<String>,
-    pub is_public: bool,
-    pub section: String,
-    pub external: bool,
+    pub link_attr: LinkAttr,
 }
 
 impl Function {
     fn parse(
         funcs: &IndexMap<String, Function>,
         stream: &mut TokenStream,
-        section: String,
+        mut link_attr: LinkAttr,
     ) -> Result<Self, AstErr> {
         let mut kw = stream.peek();
 
@@ -146,12 +226,17 @@ impl Function {
         if is_public {
             stream.advance();
             kw = stream.peek();
+            link_attr = link_attr.into_pub();
         }
         let has_body = match kw {
             Token::Keyword("extern_def") => false,
             Token::Keyword("begin_def") => true,
             _ => return Err(AstErr::BadToken(kw.to_string())),
         };
+
+        if !has_body {
+            link_attr = link_attr.into_external();
+        }
 
         stream.advance();
 
@@ -180,9 +265,7 @@ impl Function {
             name,
             body,
             args,
-            is_public,
-            section,
-            external: !has_body,
+            link_attr,
         })
     }
 

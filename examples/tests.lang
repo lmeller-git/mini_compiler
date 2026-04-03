@@ -1,0 +1,36 @@
+extern_def println;
+
+begin_def add x, y, to;
+	*to = x + y;
+end_def
+
+
+link_attr section test_array;
+public begin_def test_add;
+	to = 0;
+
+	add 1, 2, &to;
+	if !(to == 3); *0;
+
+	add 21, 21, &to;
+
+	if !(to == 42); *0;
+
+end_def
+
+link_attr section test_array;
+public begin_def test_add2;
+	to = 0;
+
+	add 0, 3, &to;
+	if !(to == 3); *0;
+
+	add 20, 22, &to;
+
+	if !(to == 42); *0;
+end_def
+
+
+public begin_def main;
+	print_str "hello there, to run the tests, pass --test to the compiler flags";
+end_def

@@ -30,9 +30,13 @@ struct ParserImpl {
 
     #[arg(short, long, default_value_t = false)]
     clean: bool,
+
+    #[arg(short, long, default_value_t = false)]
+    test: bool,
 }
 
 fn main() {
+    let repo_root = env!("CARGO_MANIFEST_DIR");
     let args = ParserImpl::parse();
     VERBOSITY.store(args.verbosity, Ordering::Relaxed);
 
@@ -44,6 +48,7 @@ fn main() {
         } else if path.is_file()
             && let Some(ext) = path.extension().and_then(|s| s.to_str())
         {
+            let path = fs::canonicalize(path).unwrap();
             files
                 .entry(ext.to_string())
                 .and_modify(|f| {
@@ -71,6 +76,18 @@ fn main() {
 
     let mut obj_files = Vec::new();
 
+    if args.test {
+        let test_runner = &format!("{}/lib/test_runner.lang", repo_root);
+        println!("{}", test_runner);
+
+        files
+            .entry("lang".to_string())
+            .and_modify(|f| {
+                f.insert(test_runner.into());
+            })
+            .or_insert([test_runner.into()].into());
+    }
+
     print_if!(1, "compiling {} files...", files.len());
 
     for (ext, files) in &files {
@@ -79,20 +96,19 @@ fn main() {
         }
         for file in files {
             let f_name = file.file_stem().unwrap().to_str().unwrap();
+            let parent = file.parent().unwrap_or(Path::new("."));
+
+            let safe_parent = parent.strip_prefix(repo_root).unwrap_or(parent);
 
             let asm_path = if ext == "asm" {
                 file
             } else {
-                &target_dir
-                    .join(file.parent().unwrap_or(Path::new(".")))
-                    .join(format!("{}.asm", f_name))
+                &target_dir.join(safe_parent).join(format!("{}.asm", f_name))
             };
             let obj_path = if ext == "o" {
                 file.clone()
             } else {
-                target_dir
-                    .join(file.parent().unwrap_or(Path::new(".")))
-                    .join(format!("{}.o", f_name))
+                target_dir.join(safe_parent).join(format!("{}.o", f_name))
             };
 
             create_dir_all(obj_path.parent().unwrap()).unwrap();
@@ -134,7 +150,12 @@ fn main() {
         final_binary.display()
     );
 
-    link_with_gcc(&obj_files, &final_binary);
+    let mut gcc_args = Vec::new();
+    if args.test {
+        gcc_args.push("-Wl,--wrap=main".into());
+    }
+
+    link_with_gcc(&obj_files, &final_binary, &gcc_args);
 
     print_if!(0, "Compiled files into: {}", final_binary.display());
 }
@@ -167,7 +188,7 @@ fn assemble(asm_path: &Path, obj_path: &Path) {
     assert!(status.success(), "nasm failed for {}", asm_path.display());
 }
 
-fn link_with_gcc(obj_files: &[PathBuf], out_path: &Path) {
+fn link_with_gcc(obj_files: &[PathBuf], out_path: &Path, extra_args: &[String]) {
     let mut args = vec!["-no-pie".to_string()];
 
     for obj in obj_files {
@@ -176,6 +197,8 @@ fn link_with_gcc(obj_files: &[PathBuf], out_path: &Path) {
 
     args.push("-o".to_string());
     args.push(out_path.display().to_string());
+
+    args.extend_from_slice(extra_args);
 
     let status = Command::new("gcc")
         .args(&args)
@@ -191,6 +214,7 @@ fn recursive_collect(dir: &Path, files: &mut HashMap<String, HashSet<PathBuf>>) 
             if path.is_file()
                 && let Some(ext) = path.extension().and_then(|s| s.to_str())
             {
+                let path = fs::canonicalize(path.clone()).unwrap();
                 files
                     .entry(ext.to_string())
                     .and_modify(|f| {

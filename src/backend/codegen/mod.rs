@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use indexmap::IndexMap;
 
-use crate::frontend::ast::{Ast, Expr, LValue, Line, Operation, Val, is_builtin_func};
+use crate::frontend::ast::{Ast, Expr, LValue, Line, LinkAttr, Operation, Val, is_builtin_func};
 pub mod x86_64;
 
 #[derive(Debug)]
@@ -35,9 +35,7 @@ impl ProgramIR {
                             arg
                         })
                         .collect(),
-                    is_public: func.is_public,
-                    section: func.section.clone(),
-                    external: func.external,
+                    link_attr: func.link_attr.clone(),
                 },
             );
         }
@@ -50,9 +48,7 @@ pub struct FunctionIR {
     pub name: String,
     pub args: Vec<String>,
     pub body: CodeTree,
-    pub is_public: bool,
-    pub section: String,
-    pub external: bool,
+    pub link_attr: LinkAttr,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]

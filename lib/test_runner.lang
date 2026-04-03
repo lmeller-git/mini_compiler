@@ -1,0 +1,42 @@
+extern_def println;
+
+extern_def __start_test_array;
+extern_def __stop_test_array;
+
+public begin_def __wrap_main;
+	start = 0;
+	end = 0;
+	asm "
+	lea rax, [rel __start_test_array]
+	mov [____wrap_main_var_start], rax
+	lea rax, [rel __stop_test_array]
+	mov [____wrap_main_var_end], rax
+	";
+	n_tests = (end - start) / 8;
+
+	i = 0;
+	label test_loop;
+	if start == end; goto end_loop;
+	print_str "Running test ";
+	print i + 1;
+	print_str "/";
+	print n_tests;
+
+	meta = *start;
+
+	print_str "  ";
+	print_str *(meta + 16);
+	print_str "\n";
+
+	asm "
+	mov rax, [____wrap_main_var_meta]
+	mov rax, [rax + 8]
+	call rax
+	";
+	print_str " [OK]\n";
+	start = start + 8;
+	i = i + 1;
+	goto test_loop;
+
+	label end_loop;
+end_def

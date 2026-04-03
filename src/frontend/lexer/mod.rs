@@ -148,6 +148,7 @@ impl Display for Token<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct TokenStream<'a> {
     inner: Vec<Token<'a>>,
     cursor: usize,
