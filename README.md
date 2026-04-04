@@ -111,6 +111,15 @@ Linker section tests is used for test functions, i.e. functions annotated with
 
 will be run in a test run.
 
+Condtional compilation of function declarations or lines can be achieved with
+
+```
+ cfg <expr>;
+ <func/line>
+```
+
+Test runs will automatically inject --cfg test, thus functions annotated with `cfg test;` will only be compiled in test runs (unless explicilty added).
+
 ## Builtin functions
 
 The current supported builtin functions are
