@@ -296,7 +296,7 @@ impl CodeBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::frontend::get_ast;
+    use crate::frontend::{cfg::CfgEnv, get_ast};
 
     #[test]
     fn code() {
@@ -308,7 +308,7 @@ mod tests {
             x + 2;
             end_def
         ";
-        let ast = get_ast(s).unwrap();
+        let ast = get_ast(s, &CfgEnv::default()).unwrap();
         let code =
             CodeBuilder::new().build(ast.funcs().next().unwrap().body().unwrap(), "main".into());
         let code_true = CodeTree {
