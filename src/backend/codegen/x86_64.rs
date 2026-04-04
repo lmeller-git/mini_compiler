@@ -282,7 +282,10 @@ impl AsmWriter {
                     self.write_in_fn(format_args!("sub rsp, 8"));
                     temps.inc_stack(8);
                 }
-                self.write_in_fn(format_args!("mov edi, 0"));
+                self.write_in_fn(format_args!(
+                    "mov edi, {}",
+                    self.get_var_str(&args[0], vars, temps)
+                ));
                 self.write_in_fn(format_args!("call exit"));
             }
             "addr_of" => self.builtin_addr_of(args, vars, temps),

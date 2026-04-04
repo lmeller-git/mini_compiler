@@ -14,6 +14,7 @@ end_def
 public begin_def __wrap_main;
 	start = 0;
 	end = 0;
+	tests_failed = 0;
 	asm "
 	lea rax, [rel __start_tests]
 	mov [____wrap_main_var_start], rax
@@ -56,6 +57,7 @@ public begin_def __wrap_main;
 
 	label failed_print;
 	print_str "\t\x1b[31m[ERR]\x1b[0m\n";
+	tests_failed = 1;
 
 	label test_done;
 	start = start + 8;
@@ -63,4 +65,6 @@ public begin_def __wrap_main;
 	goto test_loop;
 
 	label end_loop;
+	exit tests_failed;
 end_def
+
