@@ -15,7 +15,7 @@ Clone this repository and run:
 
 ## Usage
 
-write your code into some file, then call
+Write your code into some file, then call
 
 ```bash
 cargo run --release -- <file>
@@ -37,15 +37,33 @@ All children of directories with extension `ext` will be compiled.
 
 To link against the std library simply include `<path to mini_compiler_repo>/lib/std`
 
-To call functions via FFI, use `c_call` or `c_call_arr` in `lib/std/ffi.asm`
+```bash
+cargo run --release -- <your files> ./lib/std
+```
 
 Run tests easily with `cargo run --release -- <files> --test`
 
+To call functions via FFI, use `c_call` or `c_call_arr` in `lib/std/ffi.asm`
+
 ## Syntax
+
+A simple hello world with mini_compiler could look like this:
+
+```
+public begin_def main argc, argv;
+ name = *argv;
+ print_str "hello world from ";
+ print_str name;
+ print_str "\n";
+end_def
+```
+
 
 Declare a variable with:
 
 ```<ident> = <expr>;```
+
+All variables are qwords.
 
 Define a function with:
 
@@ -85,6 +103,11 @@ Everything else are exprs.
 Valid exprs use basic math operators, parentheses, strlits and pointer derefs/refs:
 
 ```(<expr> + <expr>) - (<expr> + <expr>);```
+
+```
+ptr = &0;
+print *ptr + 42;
+```
 
 
 Inline assembly may be written with
