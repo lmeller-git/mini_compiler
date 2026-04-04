@@ -93,6 +93,19 @@ public begin_def str_insert str, value, at;
 	label exit;
 end_def
 
+# Usage: str_get str, at, &to;
+begin_def str_get str, at, to;
+	if !(*str > at); __bound_violation *str, at, "in get";
+	*to = *(str + at + 8) % 256;
+end_def
+
+# Usage: str_set str, at, value;
+begin_def str_set str, at, value;
+	if !(*str > at); __bound_violation *str, at, "in get";
+	position = *str + at + 8;
+	__insert_byte str + at + 8, value;
+end_def
+
 # Usage: str_pop &str, &to;
 public begin_def str_pop str, to;
 	if **str; goto non_empty;
@@ -117,7 +130,7 @@ public begin_def str_remove str, from, to;
 	goto exit;
 
 	label within;
-	*to = *(*str + from + 8);
+	*to = *(*str + from + 8) % 256;
 	call_memmove *str + from + 8, *str + from + 9, (**str - from) - 1;
 	**str = **str - 1;
 
@@ -128,8 +141,9 @@ end_def
 public begin_def str_push_strlit str, strlit;
 	len = 0;
 	label compute_len;
-	if !*(strlit + len); goto exit;
-	str_push str, *(strlit + len);
+	char = *(strlit + len) % 256;
+	if !char; goto exit;
+	str_push str, char;
 	len = len + 1;
 	goto compute_len;
 	label exit;
@@ -151,46 +165,164 @@ extern_def test_assert_eq;
 
 link_attr section tests;
 begin_def test_str_len;
+    s = 0;
+    string &s, 16;
+    len = 0;
+    str_len s, &len;
+    test_assert_eq len, 0;
+
+    str_push &s, 65;
+    str_len s, &len;
+    test_assert_eq len, 1;
+
+    str_drop s;
 end_def
 
 link_attr section tests;
 begin_def test_str_cap;
+    s = 0;
+    string &s, 16;
+    cap = 0;
+    str_cap s, &cap;
+
+    # 16 + 8 = 24. 24/8+2 = 5 vec cap. (5-1)*8 = 32 string cap.
+    test_assert_eq cap, 32;
+    str_drop s;
 end_def
 
 link_attr section tests;
 begin_def test_str_push;
+    s = 0;
+    string &s, 16;
+    str_push &s, 65;
+    str_push &s, 66;
+
+    len = 0;
+    str_len s, &len;
+    test_assert_eq len, 2;
+
+    str_drop s;
 end_def
 
 link_attr section tests;
 begin_def test_str_pop;
+    s = 0;
+    string &s, 16;
+    str_push &s, 65;
+
+    val = 0;
+    str_pop &s, &val;
+    test_assert_eq val, 65;
+
+    len = 0;
+    str_len s, &len;
+    test_assert_eq len, 0;
+
+    str_drop s;
 end_def
 
 link_attr section tests;
-begin_def test_str_inset;
+begin_def test_str_insert;
+    s = 0;
+    string &s, 16;
+    str_push &s, 65;
+    str_push &s, 67;
+    str_insert &s, 66, 1;
+
+    len = 0;
+    str_len s, &len;
+    test_assert_eq len, 3;
+
+    val = 0;
+    str_get s, 1, &val;
+    test_assert_eq val, 66;
+
+    str_drop s;
 end_def
 
 link_attr section tests;
 begin_def test_str_remove;
-end_def
+    s = 0;
+    string &s, 16;
+    str_push &s, 65;
+    str_push &s, 66;
+    str_push &s, 67;
 
+    val = 0;
+    str_remove &s, 1, &val;
+    test_assert_eq val, 66;
+
+	len = 0;
+    str_len s, &len;
+    test_assert_eq len, 2;
+
+    str_drop s;
+end_def
 
 link_attr section tests;
 begin_def test_str_extend;
+    s = 0;
+    string &s, 16;
+    lit = "Hi";
+    str_push_strlit &s, lit;
+
+    len = 0;
+    str_len s, &len;
+    test_assert_eq len, 2;
+
+    str_drop s;
 end_def
 
 link_attr section tests;
 begin_def test_str_get;
+    s = 0;
+    string &s, 16;
+    str_push &s, 65;
+    str_push &s, 66;
+
+    val = 0;
+    str_get s, 1, &val;
+    test_assert_eq val, 66;
+
+    str_drop s;
 end_def
 
 link_attr section tests;
 begin_def test_str_set;
+    s = 0;
+    string &s, 16;
+    str_push &s, 65;
+    str_set s, 0, 99;
+
+    val = 0;
+    str_get s, 0, &val;
+    test_assert_eq val, 99;
+
+    str_drop s;
 end_def
 
 link_attr section tests;
 begin_def test_str_integration;
+    s = 0;
+    string &s, 8;
+    lit = "Test";
+    str_push_strlit &s, lit;
+
+    str_set s, 0, 116; # lowercase 't'
+
+    val = 0;
+    str_get s, 0, &val;
+    test_assert_eq val, 116;
+
+    str_drop s;
 end_def
 
 link_attr section tests;
 begin_def test_str_drops;
+# TODO
+    s = 0;
+    string &s, 8;
+    str_drop s;
+    test_assert 1;
 end_def
 

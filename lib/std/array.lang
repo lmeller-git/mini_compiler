@@ -33,6 +33,11 @@ public begin_def arr in, len;
 	_static_arr_alloc = _static_arr_alloc + 8;
 end_def
 
+# Usage: arr_len array, &to;
+begin_def arr_len array, to;
+	*to = *(array - 8);
+end_def
+
 # returns the nth element of array x into to
 # arr is a ptr to an array, i.e. an array returned by function arr and n < len
 # Usage get array, n, &to;
@@ -85,17 +90,56 @@ extern_def test_assert_eq;
 
 link_attr section tests;
 begin_def array_len;
+    a = 0;
+    arr &a, 5;
+
+    len = 0;
+	arr_len a, &len;
+    test_assert_eq len, 5;
 end_def
 
-link_attr section test;
+link_attr section tests;
 begin_def array_get;
+    val = 0;
+    a = 0;
+    arr &a, 3;
+
+    arr_get a, 1, &val;
+    test_assert_eq val, 0;
+
+    arr_set a, 1, 42;
+
+    arr_get a, 1, &val;
+    test_assert_eq val, 42;
 end_def
 
-link_attr section test;
+link_attr section tests;
 begin_def array_set;
+    a = 0;
+    arr &a, 2;
+    arr_set a, 0, 100;
+
+    val = 0;
+    arr_get a, 0, &val;
+    test_assert_eq val, 100;
 end_def
 
-link_attr section test;
+link_attr section tests;
 begin_def array_integration;
-end_def
+    a = 0;
+    arr &a, 3;
 
+    arr_set a, 0, 10;
+    arr_set a, 1, 20;
+    arr_set a, 2, 30;
+
+    val = 0;
+    arr_get a, 0, &val;
+    test_assert_eq val, 10;
+
+    arr_get a, 2, &val;
+    test_assert_eq val, 30;
+
+    len = *(a - 8);
+    test_assert_eq len, 3;
+end_def

@@ -178,43 +178,153 @@ end_def
 extern_def test_assert;
 extern_def test_assert_eq;
 
-link_attr section testss;
+link_attr section tests;
 begin_def test_vec_len;
+    v = 0;
+    vec &v, 5;
+    len = 0;
+    vec_len v, &len;
+    test_assert_eq len, 0;
+
+    vec_push &v, 42;
+    vec_len v, &len;
+    test_assert_eq len, 1;
+
+    vec_drop v;
 end_def
 
 link_attr section tests;
 begin_def test_vec_cap;
+    v = 0;
+    vec &v, 10;
+    cap = 0;
+    vec_cap v, &cap;
+    test_assert_eq cap, 11;
+
+    vec_drop v;
 end_def
 
 link_attr section tests;
 begin_def test_vec_push;
+    v = 0;
+    vec &v, 2;
+    vec_push &v, 100;
+    vec_push &v, 200;
+
+    val = 0;
+    vec_get v, 0, &val;
+    test_assert_eq val, 100;
+
+    vec_get v, 1, &val;
+    test_assert_eq val, 200;
+
+    vec_drop v;
 end_def
 
 link_attr section tests;
 begin_def test_vec_pop;
+    v = 0;
+    vec &v, 5;
+    vec_push &v, 77;
+
+    val = 0;
+    vec_pop &v, &val;
+    test_assert_eq val, 77;
+
+    len = 0;
+    vec_len v, &len;
+    test_assert_eq len, 0;
+
+    vec_drop v;
 end_def
 
 link_attr section tests;
 begin_def test_vec_insert;
+    v = 0;
+    vec &v, 5;
+    vec_push &v, 10;
+    vec_push &v, 30;
+
+    vec_insert &v, 20, 1;
+
+    val = 0;
+    vec_get v, 1, &val;
+    test_assert_eq val, 20;
+
+    vec_get v, 2, &val;
+    test_assert_eq val, 30;
+
+    vec_drop v;
 end_def
 
 link_attr section tests;
 begin_def test_vec_remove;
+    v = 0;
+    vec &v, 5;
+    vec_push &v, 10;
+    vec_push &v, 20;
+    vec_push &v, 30;
+
+    val = 0;
+    vec_remove &v, 1, &val;
+    test_assert_eq val, 20;
+
+    vec_get v, 1, &val;
+    test_assert_eq val, 30;
+
+    vec_drop v;
 end_def
 
 link_attr section tests;
 begin_def test_vec_get;
+    v = 0;
+    vec &v, 3;
+    vec_push &v, 42;
+
+    val = 0;
+    vec_get v, 0, &val;
+    test_assert_eq val, 42;
+
+    vec_drop v;
 end_def
 
 link_attr section tests;
 begin_def test_vec_set;
+    v = 0;
+    vec &v, 3;
+    vec_push &v, 10;
+    vec_set v, 0, 99;
+
+    val = 0;
+    vec_get v, 0, &val;
+    test_assert_eq val, 99;
+
+    vec_drop v;
 end_def
 
 link_attr section tests;
 begin_def test_vec_integration;
+    v = 0;
+    vec &v, 1;
+    vec_push &v, 1;
+    vec_push &v, 2;
+    vec_push &v, 3;
+
+    val = 0;
+    vec_pop &v, &val;
+    test_assert_eq val, 3;
+
+    vec_set v, 0, 5;
+    vec_get v, 0, &val;
+    test_assert_eq val, 5;
+
+    vec_drop v;
 end_def
 
 link_attr section tests;
 begin_def test_vec_drops;
+    v = 0;
+    vec &v, 1;
+    vec_drop v;
+    test_assert 1;
 end_def
-

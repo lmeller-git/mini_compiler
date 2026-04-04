@@ -152,23 +152,83 @@ begin_def __get_node_pair list, at, prev_node, next_node;
 	prev = 0;
 	i = 0;
 	if (*(list + 16) / 2) < at; goto greater;
+
 	next = *list;
+	is_forward = 1;
 	goto walk;
+
 	label greater;
+	is_forward = 0;
 	next = *(list + 8);
 	at = *(list + 16) - at + 1;
 
 	label walk;
-	if at == i + 1; goto exit;
+	if at == i; goto cleanup;
 	current = *next ^ prev;
 	prev = next;
 	next = current;
 	i = i + 1;
 	goto walk;
 
-	label exit;
-	*next_node = next;
+	label cleanup;
+	if is_forward; goto exit_forward;
+
 	*prev_node = *next ^ prev;
+	*next_node = next;
+	goto exit;
+
+	label exit_forward;
+	*next_node = next;
+	*prev_node = prev;
+
+	label exit;
+end_def
+
+# Usage: ll_get list, at, &to;
+begin_def ll_get list, at, to;
+	if !(*(list + 16) > at); __bound_violation *(list + 16), at, "in get";
+	if !at; goto head;
+	if at == *(list + 16); goto tail;
+
+	prev = 0;
+	node = 0;
+	__get_node_pair list, at, &prev, &node;
+	*to = *(node + 8);
+	goto exit;
+
+	label tail;
+	*to = *(*(list + 8) + 8);
+	goto exit;
+
+	label head;
+	*to = *(*list + 8);
+
+	label exit;
+end_def
+
+# Usage: ll_set list, at, value;
+begin_def ll_set list, at, value;
+	if !(*(list + 16) > at); __bound_violation *(list + 16), at, "in set";
+	if !at; goto head;
+	if at == *(list + 16); goto tail;
+
+	prev = 0;
+	node = 0;
+	__get_node_pair list, at, &prev, &node;
+	payload = node + 8;
+	*payload = value;
+	goto exit;
+
+	label tail;
+	payload = (*(list + 8) + 8);
+	*payload = value;
+	goto exit;
+
+	label head;
+	payload = *list + 8;
+	*payload = value;
+
+	label exit;
 end_def
 
 # Usage: ll_insert list, at, value;
@@ -211,12 +271,11 @@ public begin_def ll_remove list, at, to;
 
 	node = 0;
 	prev = 0;
-	__get_node_pair list, at + 1, &prev, &node;
+	__get_node_pair list, at, &prev, &node;
 
 	next = *node ^ prev;
 	*prev = *prev ^ node ^ next;
 	*next = *next ^ node ^ prev;
-
 
 	*to = *(node + 8);
 	ll_drop_node node;
@@ -275,41 +334,200 @@ extern_def test_assert_eq;
 
 link_attr section tests;
 begin_def test_ll_len;
-end_def
+    l = 0;
+    linked_list &l;
 
-link_attr section tests;
-begin_def test_ll_cap;
+    len = 0;
+    ll_len l, &len;
+    test_assert_eq len, 0;
+
+    ll_push_front l, 10;
+    ll_len l, &len;
+    test_assert_eq len, 1;
+
+    ll_drop_list l;
 end_def
 
 link_attr section tests;
 begin_def test_ll_push;
+    l = 0;
+    linked_list &l;
+
+    ll_push_front l, 10;
+    ll_push_tail l, 20;
+
+    val = 0;
+    ll_get l, 0, &val;
+    test_assert_eq val, 10;
+
+    ll_get l, 1, &val;
+    test_assert_eq val, 20;
+
+    ll_drop_list l;
 end_def
 
 link_attr section tests;
 begin_def test_ll_pop;
+    l = 0;
+    linked_list &l;
+
+    ll_push_front l, 10;
+    ll_push_tail l, 20;
+
+    val = 0;
+    ll_pop_front l, &val;
+    test_assert_eq val, 10;
+
+    ll_pop_tail l, &val;
+    test_assert_eq val, 20;
+
+    ll_drop_list l;
 end_def
 
 link_attr section tests;
 begin_def test_ll_insert;
+    l = 0;
+    linked_list &l;
+
+    ll_push_front l, 10;
+    ll_push_tail l, 30;
+    ll_insert l, 1, 20;
+	ll_insert l, 0, 42;
+	ll_insert l, 3, 999;
+
+    val = 0;
+    ll_get l, 1, &val;
+    test_assert_eq val, 10;
+
+    ll_drop_list l;
 end_def
 
 link_attr section tests;
 begin_def test_ll_remove;
+    l = 0;
+    linked_list &l;
+
+    ll_push_tail l, 10;
+    ll_push_tail l, 20;
+    ll_push_tail l, 30;
+
+    val = 0;
+    ll_remove l, 1, &val;
+    test_assert_eq val, 20;
+
+	ll_push_front l, 42;
+
+	ll_remove l, 2, &val;
+	test_assert_eq val, 30;
+
+    ll_get l, 1, &val;
+    test_assert_eq val, 10;
+
+    ll_drop_list l;
 end_def
 
 link_attr section tests;
 begin_def test_ll_get;
+    l = 0;
+    linked_list &l;
+    ll_push_tail l, 99;
+    ll_push_tail l, 42;
+
+    val = 0;
+    ll_get l, 1, &val;
+    test_assert_eq val, 42;
+
+    ll_drop_list l;
 end_def
 
 link_attr section tests;
 begin_def test_ll_set;
+    l = 0;
+    linked_list &l;
+    ll_push_front l, 10;
+
+    ll_set l, 0, 99;
+
+    val = 0;
+    ll_get l, 0, &val;
+    test_assert_eq val, 99;
+
+    ll_drop_list l;
 end_def
 
 link_attr section tests;
 begin_def test_ll_integration;
+    l = 0;
+    linked_list &l;
+
+    # 1. Build a baseline list: [10, 20, 30, 40, 50]
+    ll_push_tail l, 10;
+    ll_push_tail l, 20;
+    ll_push_tail l, 30;
+    ll_push_tail l, 40;
+    ll_push_tail l, 50;
+
+    # 2. Test Forward Insert
+    # Length is 5. Midpoint is 2. Index 1 < 2, so it walks FORWARD.
+    # List becomes: [10, 15, 20, 30, 40, 50]
+    ll_insert l, 1, 15;
+
+    # 3. Test Backward Insert
+    # Length is 6. Midpoint is 3. Index 5 > 3, so it walks BACKWARD.
+    # List becomes: [10, 15, 20, 30, 40, 45, 50]
+    ll_insert l, 5, 45;
+
+    # Verify insertions
+    val = 0;
+    ll_get l, 1, &val;
+    test_assert_eq val, 15;
+
+    ll_get l, 5, &val;
+    test_assert_eq val, 45;
+
+    # 4. Test Forward Remove
+    # Length is 7. Midpoint is 3. Index 2 < 3, so it walks FORWARD.
+    # Removes '20'. List becomes: [10, 15, 30, 40, 45, 50]
+    ll_remove l, 2, &val;
+
+    # 5. Test Backward Remove
+    # Length is 6. Midpoint is 3. Index 4 > 3, so it walks BACKWARD.
+    # Removes '45'. List becomes: [10, 15, 30, 40, 50]
+    ll_remove l, 4, &val;
+
+    # Verify removals and structure integrity
+    ll_get l, 2, &val;
+    test_assert_eq val, 30; # The '30' should have shifted down to index 2
+
+    ll_get l, 4, &val;
+    test_assert_eq val, 50; # The '50' should have shifted down to index 4
+
+    # 6. Test Set (Forward walk)
+    # List becomes: [10, 99, 30, 40, 50]
+    ll_set l, 1, 99;
+    ll_get l, 1, &val;
+    test_assert_eq val, 99;
+
+    # 7. Test original pushes to front and back to ensure ends are still valid
+    # List becomes: [1, 10, 99, 30, 40, 50, 999]
+    ll_push_front l, 1;
+    ll_push_tail l, 999;
+
+    ll_get l, 0, &val;
+    test_assert_eq val, 1;
+
+    # Length is now 7. Last index is 6.
+    ll_get l, 6, &val;
+    test_assert_eq val, 999;
+
+    ll_drop_list l;
 end_def
 
 link_attr section tests;
 begin_def test_ll_drops;
+	# TODO
+    l = 0;
+    linked_list &l;
+    ll_drop_list l;
+    test_assert 1;
 end_def
-
