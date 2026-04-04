@@ -1,10 +1,10 @@
 extern_def linked_list;
 extern_def ll_len;
-extern_def push_tail;
-extern_def pop_front;
-extern_def pop_tail;
-extern_def remove;
-extern_def insert;
+extern_def ll_push_tail;
+extern_def ll_pop_front;
+extern_def ll_pop_tail;
+extern_def ll_remove;
+extern_def ll_insert;
 extern_def print_ll;
 extern_def println;
 
@@ -21,10 +21,10 @@ public begin_def main;
 
     # Test basic pushes
     print_str "--- PUSH TAIL ---\n";
-    push_tail ll, 10;
-    push_tail ll, 20;
-    push_tail ll, 30;
-    push_tail ll, 40;
+    ll_push_tail ll, 10;
+    ll_push_tail ll, 20;
+    ll_push_tail ll, 30;
+    ll_push_tail ll, 40;
     print_ll ll;
     print_str "\n";
 
@@ -35,7 +35,7 @@ public begin_def main;
 
     # Test insertions
     print_str "--- INSERT (99 at index 2) ---\n";
-    insert ll, 2, 99;
+    ll_insert ll, 2, 99;
     ll_len ll, &length;
     print_str "len: ";
     println length;
@@ -44,7 +44,7 @@ public begin_def main;
 
     # Test removals
     print_str "--- REMOVE (at index 1) ---\n";
-    remove ll, 1, &to;
+    ll_remove ll, 1, &to;
     print_str "len: ";
     ll_len ll, &length;
     println length;
@@ -53,11 +53,11 @@ public begin_def main;
 
     # Test popping from boundaries
     print_str "--- POPS ---\n";
-    pop_front ll, &to;
+    ll_pop_front ll, &to;
     print_str "popped front: ";
     println to;
 
-    pop_tail ll, &to;
+    ll_pop_tail ll, &to;
     print_str "popped tail: ";
     println to;
 
@@ -68,7 +68,7 @@ public begin_def main;
     # Stress test / Loop
     print_str "--- STRESS TEST (Push to length 20) ---\n";
     label push_loop;
-    push_tail ll, 42;
+    ll_push_tail ll, 42;
     ll_len ll, &length;
     if length < 20; goto push_loop;
 

@@ -1,4 +1,5 @@
 extern_def parse_argv_to_int arg, to;
+extern_def sqrt;
 
 public begin_def main argc, argv;
 	print_str "we got ";

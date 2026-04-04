@@ -44,7 +44,7 @@ cargo run --release -- examples/bit_wise.lang
 small cli script that tells you wether a number is prime or not
 
 ```bash
-cargo run --release -- examples/prime.lang lib/std/utils.lang
+cargo run --release -- examples/prime.lang lib/std/utils.lang lib/std/math.lang
 ./target/a.out
 ```
 
