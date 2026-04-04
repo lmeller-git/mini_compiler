@@ -31,12 +31,12 @@ begin_def __bound_violation len, idx, msg;
 	panic msg;
 end_def
 
-public begin_def ll_drop_node node;
+begin_def ll_drop_node node;
 	call_free node;
 end_def
 
-# Usage: push_front list, value;
-public begin_def push_front list, value;
+# Usage: ll_push_front list, value;
+public begin_def ll_push_front list, value;
 	_len_bytes = list + 16;
 	node = 0;
 	allocate_node &node;
@@ -60,8 +60,8 @@ public begin_def push_front list, value;
 	*_len_bytes = *_len_bytes + 1;
 end_def
 
-# Usage: push_tail list, value;
-public begin_def push_tail list, value;
+# Usage: ll_push_tail list, value;
+public begin_def ll_push_tail list, value;
 	_len_bytes = list + 16;
 	node = 0;
 	allocate_node &node;
@@ -86,7 +86,8 @@ public begin_def push_tail list, value;
 	*_len_bytes = *_len_bytes + 1;
 end_def
 
-public begin_def pop_front list, to;
+# Usage: ll_pop_front list, &to;
+public begin_def ll_pop_front list, to;
 	_len_bytes = list + 16;
 	if *_len_bytes; goto non_empty;
 	*to = 0;
@@ -115,7 +116,8 @@ public begin_def pop_front list, to;
 	label exit;
 end_def
 
-public begin_def pop_tail list, to;
+# Usage: ll_pop_tail list, &to;
+public begin_def ll_pop_tail list, to;
 	_len_bytes = list + 16;
 	if *_len_bytes; goto non_empty;
 	*to = 0;
@@ -145,16 +147,6 @@ public begin_def pop_tail list, to;
 	label exit;
 end_def
 
-begin_def __insert_between prev, next, value;
-	node = 0;
-	allocate_node &node;
-	*node = prev ^ next;
-	payload = node + 8;
-	*payload = value;
-	*next = *next ^ prev ^ node;
-	*prev = *prev ^ next ^ node;
-end_def
-
 begin_def __get_node_pair list, at, prev_node, next_node;
 	if !(*(list + 16) > at); __bound_violation *(list + 16), at, "in __get_node";
 	prev = 0;
@@ -179,7 +171,8 @@ begin_def __get_node_pair list, at, prev_node, next_node;
 	*prev_node = *next ^ prev;
 end_def
 
-public begin_def insert list, at, value;
+# Usage: ll_insert list, at, value;
+public begin_def ll_insert list, at, value;
 	_len_bytes = list + 16;
 	if *_len_bytes < at; __bound_violation *_len_bytes, at, "in insert";
 	if !at; goto front;
@@ -201,17 +194,16 @@ public begin_def insert list, at, value;
 	goto exit;
 
 	label front;
-	push_front list, value;
+	ll_push_front list, value;
 	goto exit;
 	label tail;
-	push_tail list, value;
+	ll_push_tail list, value;
 
 	label exit;
 end_def
 
-extern_def println;
-
-public begin_def remove list, at, to;
+# Usage: ll_remove list, at, &to;
+public begin_def ll_remove list, at, to;
 	_len_bytes = list + 16;
 	if !(*_len_bytes > at); __bound_violation *_len_bytes, at, "in remove";
 	if !at; goto front;
@@ -232,14 +224,15 @@ public begin_def remove list, at, to;
 	goto exit;
 
 	label tail;
-	pop_tail list, to;
+	ll_pop_tail list, to;
 	goto exit;
 	label front;
-	pop_front list, to;
+	ll_pop_front list, to;
 
 	label exit;
 end_def
 
+# Usage: print_ll list;
 public begin_def print_ll list;
 	print_str "[ ";
 	next = *list;
@@ -256,9 +249,9 @@ public begin_def print_ll list;
 
 	label exit;
 	print_str " ]";
-
 end_def
 
+# Usage: ll_drop_list list;
 public begin_def ll_drop_list list;
 	next = *list;
 	prev = 0;
@@ -274,3 +267,49 @@ public begin_def ll_drop_list list;
 	label exit;
 	call_free list;
 end_def
+
+
+# Tests
+extern_def test_assert;
+extern_def test_assert_eq;
+
+link_attr section tests;
+begin_def test_ll_len;
+end_def
+
+link_attr section tests;
+begin_def test_ll_cap;
+end_def
+
+link_attr section tests;
+begin_def test_ll_push;
+end_def
+
+link_attr section tests;
+begin_def test_ll_pop;
+end_def
+
+link_attr section tests;
+begin_def test_ll_insert;
+end_def
+
+link_attr section tests;
+begin_def test_ll_remove;
+end_def
+
+link_attr section tests;
+begin_def test_ll_get;
+end_def
+
+link_attr section tests;
+begin_def test_ll_set;
+end_def
+
+link_attr section tests;
+begin_def test_ll_integration;
+end_def
+
+link_attr section tests;
+begin_def test_ll_drops;
+end_def
+

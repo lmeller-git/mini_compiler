@@ -145,3 +145,52 @@ public begin_def str_drop str;
 	vec_drop str;
 end_def
 
+# Tests
+extern_def test_assert;
+extern_def test_assert_eq;
+
+link_attr section tests;
+begin_def test_str_len;
+end_def
+
+link_attr section tests;
+begin_def test_str_cap;
+end_def
+
+link_attr section tests;
+begin_def test_str_push;
+end_def
+
+link_attr section tests;
+begin_def test_str_pop;
+end_def
+
+link_attr section tests;
+begin_def test_str_inset;
+end_def
+
+link_attr section tests;
+begin_def test_str_remove;
+end_def
+
+
+link_attr section tests;
+begin_def test_str_extend;
+end_def
+
+link_attr section tests;
+begin_def test_str_get;
+end_def
+
+link_attr section tests;
+begin_def test_str_set;
+end_def
+
+link_attr section tests;
+begin_def test_str_integration;
+end_def
+
+link_attr section tests;
+begin_def test_str_drops;
+end_def
+

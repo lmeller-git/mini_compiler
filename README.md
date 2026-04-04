@@ -103,10 +103,10 @@ Linker attributes for functions may be defined with
  <function def / extern def>
 ```
 
-Linker section test_array is used for test functions, i.e. functions annotated with
+Linker section tests is used for test functions, i.e. functions annotated with
 
 ```
- link_attr section test_array;
+ link_attr section tests;
 ```
 
 will be run in a test run.

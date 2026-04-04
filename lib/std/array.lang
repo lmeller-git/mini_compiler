@@ -77,3 +77,25 @@ public begin_def print_arr array;
 	label end_print;
 	print_str " ]";
 end_def
+
+
+# Tests
+extern_def test_assert;
+extern_def test_assert_eq;
+
+link_attr section tests;
+begin_def array_len;
+end_def
+
+link_attr section test;
+begin_def array_get;
+end_def
+
+link_attr section test;
+begin_def array_set;
+end_def
+
+link_attr section test;
+begin_def array_integration;
+end_def
+

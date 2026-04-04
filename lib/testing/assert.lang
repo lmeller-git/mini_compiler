@@ -1,3 +1,6 @@
+# Utilities for testing functions
+# Using these functions instead of standard assert, allows the program to continue after a failure
+
 extern_def _test_state_set_failed;
 extern_def println;
 

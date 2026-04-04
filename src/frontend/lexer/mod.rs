@@ -7,6 +7,7 @@ static KEYWORDS: &[&str] = &[
     "extern_def",
     "public",
     "link_attr",
+    "cfg",
 ];
 
 #[allow(clippy::upper_case_acronyms)]

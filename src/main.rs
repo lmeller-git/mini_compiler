@@ -109,7 +109,12 @@ fn main() {
             let needs_recompile = args.clean || needs_recompile(file, &obj_path).unwrap();
 
             if needs_recompile && ext != "asm" {
-                print_if!(1, "Compiling {}", file.display());
+                print_if!(
+                    0,
+                    "\x1b[1;32mCompiling\x1b[0m {}\t\x1b[34m( -> {})\x1b[0m",
+                    file.file_name().unwrap().display(),
+                    file.display()
+                );
                 let mut s = String::new();
                 File::open(file).unwrap().read_to_string(&mut s).unwrap();
 
@@ -150,7 +155,11 @@ fn main() {
 
     link_with_gcc(&obj_files, &final_binary, &gcc_args);
 
-    print_if!(0, "Compiled files into: {}", final_binary.display());
+    print_if!(
+        0,
+        "\x1b[1;32mFinished\x1b[0m Binary in {}",
+        final_binary.display()
+    );
 }
 
 fn needs_recompile(source: &Path, target_obj: &Path) -> Result<bool, io::Error> {

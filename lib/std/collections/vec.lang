@@ -173,3 +173,48 @@ public begin_def print_vec vector;
 	print_str " ]";
 end_def
 
+
+# Tests
+extern_def test_assert;
+extern_def test_assert_eq;
+
+link_attr section testss;
+begin_def test_vec_len;
+end_def
+
+link_attr section tests;
+begin_def test_vec_cap;
+end_def
+
+link_attr section tests;
+begin_def test_vec_push;
+end_def
+
+link_attr section tests;
+begin_def test_vec_pop;
+end_def
+
+link_attr section tests;
+begin_def test_vec_insert;
+end_def
+
+link_attr section tests;
+begin_def test_vec_remove;
+end_def
+
+link_attr section tests;
+begin_def test_vec_get;
+end_def
+
+link_attr section tests;
+begin_def test_vec_set;
+end_def
+
+link_attr section tests;
+begin_def test_vec_integration;
+end_def
+
+link_attr section tests;
+begin_def test_vec_drops;
+end_def
+

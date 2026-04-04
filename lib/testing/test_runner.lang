@@ -2,11 +2,11 @@ extern_def println;
 extern_def _test_state_read_flag;
 extern_def _test_state_reset_flag;
 extern_def _test_state_set_failed;
-extern_def __start_test_array;
-extern_def __stop_test_array;
+extern_def __start_tests;
+extern_def __stop_tests;
 extern_def test_assert;
 
-link_attr section test_array;
+link_attr section tests;
 begin_def health;
 	test_assert 1;
 end_def
@@ -15,9 +15,9 @@ public begin_def __wrap_main;
 	start = 0;
 	end = 0;
 	asm "
-	lea rax, [rel __start_test_array]
+	lea rax, [rel __start_tests]
 	mov [____wrap_main_var_start], rax
-	lea rax, [rel __stop_test_array]
+	lea rax, [rel __stop_tests]
 	mov [____wrap_main_var_end], rax
 	";
 	n_tests = (end - start) / 8;
@@ -55,7 +55,7 @@ public begin_def __wrap_main;
 	goto test_done;
 
 	label failed_print;
-	print_str "\t\x1b[31m[ERR]\x1b[0m\n ";
+	print_str "\t\x1b[31m[ERR]\x1b[0m\n";
 
 	label test_done;
 	start = start + 8;

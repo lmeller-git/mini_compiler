@@ -1,7 +1,11 @@
+# Global state for inspecting test results
+
+# tricks the compiler into allocating a ptr to an empty function, which we can use as static flag
 link_attr raw section __test_flag;
 begin_def __static_test_failed;
 end_def
 
+# Sets static test_failed flag to true
 public begin_def _test_state_set_failed;
 	asm "
 	lea rax, [rel __static_test_failed_ptr]
@@ -9,6 +13,7 @@ public begin_def _test_state_set_failed;
 	";
 end_def
 
+# Sets static test_failed flag to false
 public begin_def _test_state_reset_flag;
 	asm "
 	lea rax, [rel __static_test_failed_ptr]
@@ -16,6 +21,7 @@ public begin_def _test_state_reset_flag;
 	";
 end_def
 
+# reads test_failed flag into to
 public begin_def _test_state_read_flag to;
 	asm "
 	lea rax, [rel __static_test_failed_ptr]
