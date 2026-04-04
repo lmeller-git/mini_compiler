@@ -329,9 +329,12 @@ end_def
 
 
 # Tests
+cfg test;
 extern_def test_assert;
+cfg test;
 extern_def test_assert_eq;
 
+cfg test;
 link_attr section tests;
 begin_def test_ll_len;
     l = 0;
@@ -348,6 +351,7 @@ begin_def test_ll_len;
     ll_drop_list l;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_ll_push;
     l = 0;
@@ -366,6 +370,7 @@ begin_def test_ll_push;
     ll_drop_list l;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_ll_pop;
     l = 0;
@@ -384,6 +389,7 @@ begin_def test_ll_pop;
     ll_drop_list l;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_ll_insert;
     l = 0;
@@ -402,6 +408,7 @@ begin_def test_ll_insert;
     ll_drop_list l;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_ll_remove;
     l = 0;
@@ -426,6 +433,7 @@ begin_def test_ll_remove;
     ll_drop_list l;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_ll_get;
     l = 0;
@@ -440,6 +448,7 @@ begin_def test_ll_get;
     ll_drop_list l;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_ll_set;
     l = 0;
@@ -455,6 +464,7 @@ begin_def test_ll_set;
     ll_drop_list l;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_ll_integration;
     l = 0;
@@ -523,6 +533,7 @@ begin_def test_ll_integration;
     ll_drop_list l;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_ll_drops;
 	# TODO

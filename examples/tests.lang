@@ -6,7 +6,13 @@ begin_def add x, y, to;
 	*to = x + y;
 end_def
 
+cfg !test;
+link_attr section tests;
+begin_def not_tested;
+	print_str "this function is not compiled in a test run!\n";
+end_def
 
+cfg test;
 link_attr section tests;
 public begin_def test_add;
 	to = 0;
@@ -19,6 +25,7 @@ public begin_def test_add;
 
 end_def
 
+cfg test;
 link_attr section tests;
 public begin_def test_add2;
 	to = 0;
@@ -31,6 +38,7 @@ public begin_def test_add2;
 
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def failure;
 	test_assert_eq 1, 2;
@@ -38,5 +46,6 @@ end_def
 
 
 public begin_def main;
+	not_tested;
 	print_str "hello there, to run the tests, pass --test to the compiler flags";
 end_def

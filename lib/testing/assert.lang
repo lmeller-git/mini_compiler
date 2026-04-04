@@ -4,6 +4,7 @@
 extern_def _test_state_set_failed;
 extern_def println;
 
+cfg test;
 public begin_def test_assert x;
 	if x; goto exit;
 	_test_state_set_failed;
@@ -11,6 +12,7 @@ public begin_def test_assert x;
 	label exit;
 end_def
 
+cfg test;
 public begin_def test_assert_eq a, b;
 	if a == b; goto exit;
 	_test_state_set_failed;

@@ -8,7 +8,11 @@ use std::{
 };
 
 use clap::Parser;
-use mini_compiler::{VERBOSITY, backend, frontend::get_ast, print_if};
+use mini_compiler::{
+    VERBOSITY, backend,
+    frontend::{cfg::CfgEnv, get_ast},
+    print_if,
+};
 
 #[derive(clap::Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -33,6 +37,9 @@ struct ParserImpl {
 
     #[arg(short, long, default_value_t = false)]
     test: bool,
+
+    #[arg(long = "cfg", value_name = "SPEC")]
+    cfgs: Vec<String>,
 }
 
 fn main() {
@@ -63,6 +70,11 @@ fn main() {
     if files.is_empty() {
         println!("No files to compile");
         return;
+    }
+
+    let mut cfg_env = CfgEnv::default().populate(&args.cfgs);
+    if args.test {
+        cfg_env = cfg_env.populate(&["test".into()]);
     }
 
     let target_dir = PathBuf::from(args.target);
@@ -118,7 +130,7 @@ fn main() {
                 let mut s = String::new();
                 File::open(file).unwrap().read_to_string(&mut s).unwrap();
 
-                let ast = get_ast(&s).unwrap();
+                let ast = get_ast(&s, &cfg_env).unwrap();
                 print_if!(2, "AST for {}: {}", f_name, ast);
 
                 let code = backend::generate(&ast).unwrap();

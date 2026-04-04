@@ -160,9 +160,12 @@ public begin_def str_drop str;
 end_def
 
 # Tests
+cfg test;
 extern_def test_assert;
+cfg test;
 extern_def test_assert_eq;
 
+cfg test;
 link_attr section tests;
 begin_def test_str_len;
     s = 0;
@@ -178,6 +181,7 @@ begin_def test_str_len;
     str_drop s;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_str_cap;
     s = 0;
@@ -190,6 +194,7 @@ begin_def test_str_cap;
     str_drop s;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_str_push;
     s = 0;
@@ -204,6 +209,7 @@ begin_def test_str_push;
     str_drop s;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_str_pop;
     s = 0;
@@ -221,6 +227,7 @@ begin_def test_str_pop;
     str_drop s;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_str_insert;
     s = 0;
@@ -240,6 +247,7 @@ begin_def test_str_insert;
     str_drop s;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_str_remove;
     s = 0;
@@ -259,6 +267,7 @@ begin_def test_str_remove;
     str_drop s;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_str_extend;
     s = 0;
@@ -273,6 +282,7 @@ begin_def test_str_extend;
     str_drop s;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_str_get;
     s = 0;
@@ -287,6 +297,7 @@ begin_def test_str_get;
     str_drop s;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_str_set;
     s = 0;
@@ -301,6 +312,7 @@ begin_def test_str_set;
     str_drop s;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_str_integration;
     s = 0;
@@ -317,9 +329,10 @@ begin_def test_str_integration;
     str_drop s;
 end_def
 
+cfg test;
 link_attr section tests;
 begin_def test_str_drops;
-# TODO
+	# TODO
     s = 0;
     string &s, 8;
     str_drop s;

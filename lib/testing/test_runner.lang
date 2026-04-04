@@ -6,11 +6,13 @@ extern_def __start_tests;
 extern_def __stop_tests;
 extern_def test_assert;
 
+cfg test;
 link_attr section tests;
 begin_def health;
 	test_assert 1;
 end_def
 
+cfg test;
 public begin_def __wrap_main;
 	start = 0;
 	end = 0;

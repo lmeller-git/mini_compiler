@@ -2,6 +2,8 @@ use std::fmt::{Debug, Display};
 
 use indexmap::IndexMap;
 
+use crate::frontend::cfg::CfgEnv;
+
 use super::lexer::{Token, TokenStream};
 
 macro_rules! parse_list {
@@ -33,6 +35,17 @@ macro_rules! parse_list {
         $stream.advance();
         items
     }};
+}
+
+macro_rules! skip_until {
+    (
+        $stream:expr,
+        $stop_at:pat
+    ) => {
+        while !matches!(*$stream.peek(), $stop_at | Token::EOF) {
+            $stream.advance();
+        }
+    };
 }
 
 fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
@@ -90,14 +103,37 @@ pub struct Ast {
 }
 
 impl Ast {
-    pub fn from_stream(s: &mut TokenStream) -> Self {
+    pub fn from_stream(s: &mut TokenStream, cfg_env: &CfgEnv) -> Self {
         let mut functions = IndexMap::new();
         loop {
+            if let Token::EOF = *s.peek() {
+                break;
+            }
+            if let Token::Keyword("cfg") = *s.peek() {
+                s.advance();
+                let cfg = cfg_env.eval_cfg_expr(&parse_expr(s, 0.).unwrap());
+                s.advance();
+                if !cfg {
+                    skip_until!(
+                        s,
+                        Token::Keyword("begin_def") | Token::Keyword("extern_def")
+                    );
+                    match s.peek() {
+                        Token::Keyword("begin_def") => skip_until!(s, Token::Keyword("end_def")),
+                        Token::Keyword("extern_def") => skip_until!(s, Token::Semi),
+                        Token::EOF => break,
+                        _ => unreachable!(),
+                    }
+                    s.advance();
+                    continue;
+                }
+            }
+
             let link_attr = match s.peek() {
                 Token::Keyword("link_attr") => LinkAttr::parse(s).unwrap(),
                 _ => LinkAttr::default(),
             };
-            match Function::parse(&functions, s, link_attr) {
+            match Function::parse(&functions, s, link_attr, cfg_env) {
                 Ok(func) => _ = functions.insert(func.name.clone(), func),
                 Err(AstErr::Eof) => break,
                 Err(e) => panic!("err in parse: {:#?}", e),
@@ -216,6 +252,7 @@ impl Function {
         funcs: &IndexMap<String, Function>,
         stream: &mut TokenStream,
         mut link_attr: LinkAttr,
+        cfg_env: &CfgEnv,
     ) -> Result<Self, AstErr> {
         let mut kw = stream.peek();
 
@@ -250,7 +287,24 @@ impl Function {
             let mut body = Vec::new();
 
             while *stream.peek() != Token::Keyword("end_def") {
-                body.push(Line::parse(funcs, stream)?);
+                if let Token::Keyword("cfg") = stream.peek() {
+                    stream.advance();
+                    let cfg = cfg_env.eval_cfg_expr(&parse_expr(stream, 0.).unwrap());
+                    stream.advance();
+                    if !cfg {
+                        loop {
+                            let tok_is_if = *stream.peek() == Token::Keyword("if");
+                            skip_until!(stream, Token::Semi);
+                            stream.advance();
+                            if !tok_is_if {
+                                break;
+                            }
+                        }
+                        continue;
+                    }
+                }
+                let line = Line::parse(funcs, stream)?;
+                body.push(line);
             }
             stream.advance();
             Some(body)
@@ -573,7 +627,7 @@ mod tests {
           end_def
         ";
         let mut stream = TokenStream::from_str(s).unwrap();
-        let ast = Ast::from_stream(&mut stream);
+        let ast = Ast::from_stream(&mut stream, &CfgEnv::default());
         assert_eq!(
             format!("{}", ast),
             "fn main() {\ndeclare x = (1 + 2);\ncall print (x * (5 + 2));\ndeclare y = (x / (3 + 2));\n(x + ((y / 5) * 4));\n};\n"
