@@ -51,6 +51,7 @@ pub struct Span {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token<'a> {
     Ident(&'a str),
+    Number(i64),
     Lit(&'a str),
     Keyword(&'a str),
     Eq,
@@ -160,16 +161,28 @@ impl<'a> Token<'a> {
     }
 
     fn parse_single(s: &'a str, counter: &mut usize) -> Self {
+        let is_number = s.chars().next().is_some_and(|c| c.is_ascii_digit());
         let mut last_char_len = 0;
         for (i, c) in s.char_indices() {
-            if !(c.is_alphanumeric() || matches!(c, '_')) {
+            if !((is_number && c.is_ascii_digit())
+                || (!is_number && (c.is_alphanumeric() || c == '_')))
+            {
                 *counter += i - last_char_len;
-                return Self::Ident(&s[..i]).map_keyword();
+
+                if is_number {
+                    return Self::Number(s[..i].parse::<i64>().unwrap());
+                } else {
+                    return Self::Ident(&s[..i]).map_keyword();
+                }
             }
             last_char_len = c.len_utf8();
         }
         *counter += s.len();
-        Self::Ident(s).map_keyword()
+        if is_number {
+            Self::Number(s.parse::<i64>().unwrap())
+        } else {
+            Self::Ident(s).map_keyword()
+        }
     }
 
     fn map_keyword(self) -> Self {
@@ -182,7 +195,12 @@ impl<'a> Token<'a> {
 
 impl Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:#?}", self)
+        match self {
+            Self::Ident(_ident) => write!(f, "Ident"),
+            Self::Number(_num) => write!(f, "Number"),
+            Self::Lit(_lit) => write!(f, "String Literal"),
+            _ => write!(f, "{:?}", self),
+        }
     }
 }
 
@@ -293,7 +311,7 @@ mod tests {
                 .into_iter()
                 .map(|item| item.as_ref().clone())
                 .collect::<Vec<_>>(),
-            vec![Token::Ident("1"), Token::Semi, Token::EOF]
+            vec![Token::Number(1), Token::Semi, Token::EOF]
         );
         let val = "foo;";
         assert_eq!(
@@ -317,7 +335,7 @@ mod tests {
             vec![
                 Token::Ident("foo"),
                 Token::Eq,
-                Token::Ident("5"),
+                Token::Number(5),
                 Token::Semi,
                 Token::EOF
             ]
@@ -336,10 +354,10 @@ mod tests {
                 Token::OpenParen,
                 Token::Ident("foo"),
                 Token::Add,
-                Token::Ident("2"),
+                Token::Number(2),
                 Token::CloseParen,
                 Token::Star,
-                Token::Ident("5"),
+                Token::Number(5),
                 Token::Semi,
                 Token::EOF
             ]

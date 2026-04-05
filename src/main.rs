@@ -103,7 +103,7 @@ fn main() {
 
     print_if!(1, "compiling {} files...", files.len());
 
-    let mut fatal_err = false;
+    let mut total_errs = 0;
 
     for (ext, files) in &files {
         if !["asm", "o", &args.extension].contains(&ext.as_ref()) {
@@ -144,7 +144,7 @@ fn main() {
                 print_if!(2, "AST for {}: {}", f_name, ast);
 
                 if !diagnostics.errs.is_empty() {
-                    fatal_err = true;
+                    total_errs += diagnostics.errs.len();
 
                     for e in diagnostics.errs {
                         e.report(file.to_str().unwrap(), &s);
@@ -171,8 +171,12 @@ fn main() {
         }
     }
 
-    if fatal_err {
-        print_if!(0, "Compilation failed due to errors");
+    if total_errs > 0 {
+        print_if!(
+            0,
+            "\n\x1b[1;31mCompilation failed due to {} errors\x1b[0m\n",
+            total_errs
+        );
         return;
     }
 
