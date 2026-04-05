@@ -2,7 +2,9 @@ use std::{collections::HashMap, fmt::Display};
 
 use indexmap::IndexMap;
 
-use crate::frontend::ast::{Ast, Expr, LValue, Line, LinkAttr, Operation, Val, is_builtin_func};
+use crate::frontend::ast::{
+    Ast, Expr, Item, LValue, Line, LinkAttr, Operation, Val, is_builtin_func,
+};
 pub mod x86_64;
 
 #[derive(Debug)]
@@ -15,6 +17,9 @@ impl ProgramIR {
         let mut functions = IndexMap::new();
         let mut builder = CodeBuilder::new();
         for func in ast.funcs() {
+            let Item::Function(func) = func else {
+                continue;
+            };
             let code = if let Some(func_body) = func.body() {
                 builder.build(func_body, func.name.clone())
             } else {
@@ -191,6 +196,7 @@ impl CodeBuilder {
                     label,
                 });
             }
+            Line::Malformed => {}
         }
     }
 
@@ -265,6 +271,8 @@ impl CodeBuilder {
                     });
                     Operand::Temp(in_scope_temp)
                 }
+                // TODO this should probably panic instead?
+                Val::Malformed => Operand::Immediate(0),
             },
             Expr::Op(lhs, op, rhs) => {
                 let lhs = self.lower_unit(lhs.as_ref());
@@ -278,6 +286,8 @@ impl CodeBuilder {
                 });
                 Operand::Temp(res)
             }
+            // TODO this should probably panic instead?
+            Expr::Malformed => Operand::Immediate(0),
         }
     }
 
@@ -305,12 +315,23 @@ mod tests {
             x = 5 + (1 * 2);
             print x + 3;
             y = x * (5 - 2);
-            x + 2;
+            y = x + 2;
             end_def
         ";
-        let ast = get_ast(s, &CfgEnv::default()).unwrap();
-        let code =
-            CodeBuilder::new().build(ast.funcs().next().unwrap().body().unwrap(), "main".into());
+        let ast = get_ast(s, &CfgEnv::default()).0;
+        let code = CodeBuilder::new().build(
+            ast.funcs()
+                .next()
+                .map(|f| match f {
+                    Item::Function(f) => Some(f),
+                    Item::Malformed => None,
+                })
+                .unwrap()
+                .unwrap()
+                .body()
+                .unwrap(),
+            "main".into(),
+        );
         let code_true = CodeTree {
             data: HashMap::new(),
             units: vec![
@@ -364,6 +385,10 @@ mod tests {
                     lhs: Operand::Variable("__main_var_x".into()),
                     rhs: Operand::Immediate(2),
                     dest: Operand::Temp("_temp_5".into()),
+                },
+                CodeUnit::Assignment {
+                    name: LValue::Variable("__main_var_y".into()),
+                    value: Operand::Temp("_temp_5".into()),
                 },
                 CodeUnit::Cleanup,
             ],

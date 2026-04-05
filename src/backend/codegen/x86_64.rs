@@ -578,6 +578,7 @@ impl AsmWriter {
                 self.write_in_fn(format_args!("lea rax, [{}]", addr));
                 return;
             }
+            Operation::Malformed => return,
         };
         self.write_in_fn(format_args!(
             "{} rax, {}",

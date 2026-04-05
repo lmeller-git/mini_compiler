@@ -58,6 +58,7 @@ impl CfgEnv {
                 }
                 _ => false,
             },
+            Expr::Malformed => false,
         }
     }
 }

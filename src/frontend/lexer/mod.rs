@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Deref};
 
 static KEYWORDS: &[&str] = &[
     "if",
@@ -9,6 +9,43 @@ static KEYWORDS: &[&str] = &[
     "link_attr",
     "cfg",
 ];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Spanned<'a> {
+    pub token: Token<'a>,
+    pub span: Span,
+}
+
+impl<'a> Spanned<'a> {
+    fn new(token: Token<'a>, span: Span) -> Self {
+        Self { token, span }
+    }
+}
+
+impl<'a> Deref for Spanned<'a> {
+    type Target = Token<'a>;
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+
+impl<'a> AsRef<Token<'a>> for Spanned<'a> {
+    fn as_ref(&self) -> &Token<'a> {
+        &self.token
+    }
+}
+
+impl<'a> Display for Spanned<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}", self.token)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+}
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,31 +73,31 @@ pub enum Token<'a> {
     Shr,
     Shl,
     Comma,
+    Comment,
     EOF,
 }
 
 impl<'a> Token<'a> {
     fn parse(s: &'a str) -> Result<(Self, usize), LexErr> {
-        let s2 = s.trim_start();
-        if s2.is_empty() {
+        if s.is_empty() {
             return Ok((Self::EOF, 0));
         }
         let mut n_parsed = 0;
         let token = 'outer: {
-            let mut idc = s2.char_indices();
-            'inner: while let Some((i, c)) = idc.next() {
+            let mut idc = s.char_indices();
+            while let Some((i, c)) = idc.next() {
                 n_parsed += c.len_utf8();
                 match c {
                     '#' => {
                         for (_, c) in idc.by_ref() {
                             n_parsed += c.len_utf8();
                             if c == '\n' {
-                                continue 'inner;
+                                break;
                             }
                         }
-                        break 'outer Token::EOF;
+                        break 'outer Token::Comment;
                     }
-                    '\'' | '\"' => break 'outer Self::parse_quoted(&s2[i..], &mut n_parsed),
+                    '\'' | '\"' => break 'outer Self::parse_quoted(&s[i..], &mut n_parsed),
                     '+' => break 'outer Token::Add,
                     '-' => break 'outer Token::Sub,
                     '*' => break 'outer Token::Star,
@@ -73,7 +110,7 @@ impl<'a> Token<'a> {
                     '&' => break 'outer Token::Ampercent,
                     ',' => break 'outer Token::Comma,
                     '>' => {
-                        if s2.chars().nth(i + 1).is_some_and(|c| c == '>') {
+                        if s.chars().nth(i + 1).is_some_and(|c| c == '>') {
                             n_parsed += 1;
                             break 'outer Token::Shr;
                         } else {
@@ -81,7 +118,7 @@ impl<'a> Token<'a> {
                         }
                     }
                     '<' => {
-                        if s2.chars().nth(i + 1).is_some_and(|c| c == '<') {
+                        if s.chars().nth(i + 1).is_some_and(|c| c == '<') {
                             n_parsed += 1;
                             break 'outer Token::Shl;
                         } else {
@@ -90,7 +127,7 @@ impl<'a> Token<'a> {
                     }
                     '^' => break 'outer Token::Hat,
                     '=' => {
-                        if s2.chars().nth(i + 1).is_some_and(|c| c == '=') {
+                        if s.chars().nth(i + 1).is_some_and(|c| c == '=') {
                             n_parsed += 1;
                             break 'outer Token::EqEq;
                         } else {
@@ -98,7 +135,7 @@ impl<'a> Token<'a> {
                         }
                     }
                     '!' => {
-                        if s2.chars().nth(i + 1).is_some_and(|c| c == '=') {
+                        if s.chars().nth(i + 1).is_some_and(|c| c == '=') {
                             n_parsed += 1;
                             break 'outer Token::NEq;
                         } else {
@@ -106,12 +143,12 @@ impl<'a> Token<'a> {
                         }
                     }
                     w if w.is_whitespace() => continue,
-                    _ => break 'outer Self::parse_single(&s2[i..], &mut n_parsed),
+                    _ => break 'outer Self::parse_single(&s[i..], &mut n_parsed),
                 }
             }
             panic!("malformed input");
         };
-        Ok((token, n_parsed + (s.len() - s2.len())))
+        Ok((token, n_parsed))
     }
 
     fn parse_quoted(s: &'a str, counter: &mut usize) -> Self {
@@ -151,8 +188,9 @@ impl Display for Token<'_> {
 
 #[derive(Debug)]
 pub struct TokenStream<'a> {
-    inner: Vec<Token<'a>>,
+    inner: Vec<Spanned<'a>>,
     cursor: usize,
+    pub last_span: Span,
 }
 
 impl<'a> TokenStream<'a> {
@@ -160,47 +198,72 @@ impl<'a> TokenStream<'a> {
         Self {
             inner: Vec::new(),
             cursor: 0,
+            last_span: Span { start: 0, end: 0 },
         }
     }
 
-    pub fn next(&mut self) -> &Token<'_> {
-        let r = self.inner.get(self.cursor).unwrap_or(&Token::EOF);
+    pub fn next<'b>(&'b mut self) -> &'b Spanned<'a> {
+        self.last_span = self.peek().span.clone();
+        let r = self
+            .inner
+            .get(self.cursor)
+            .unwrap_or_else(|| self.inner.last().unwrap());
         self.cursor = self.inner.len().min(self.cursor + 1);
         r
     }
 
     pub fn advance(&mut self) {
+        self.last_span = self.peek().span.clone();
         self.cursor = self.inner.len().min(self.cursor + 1);
     }
 
-    pub fn peek(&self) -> &Token<'_> {
-        self.inner.get(self.cursor).unwrap_or(&Token::EOF)
+    pub fn peek<'b>(&'b self) -> &'b Spanned<'a> {
+        self.inner
+            .get(self.cursor)
+            .unwrap_or_else(|| self.inner.last().unwrap())
     }
 
-    pub fn peekn(&self, n: usize) -> &Token<'_> {
+    pub fn peekn<'b>(&'b self, n: usize) -> &'b Spanned<'a> {
         self.inner
             .get((self.cursor + n).min(self.inner.len()))
-            .unwrap_or(&Token::EOF)
+            .unwrap_or_else(|| self.inner.last().unwrap())
     }
 
-    fn push(&mut self, token: Token<'a>) {
+    fn push(&mut self, token: Spanned<'a>) {
         self.inner.push(token);
     }
 
     pub fn from_str(s: &'a str) -> Result<Self, LexErr> {
-        let s = s.trim();
         let mut stream = Self::new();
         let mut total_parsed = 0;
-        loop {
-            let s_ = &s[total_parsed..];
-            let (token, parsed) = Token::parse(s_)?;
-            total_parsed += parsed;
-            stream.push(token);
-            if total_parsed >= s.len() {
+        while total_parsed < s.len() {
+            let remainder = &s[total_parsed..];
+            let trimmed = remainder.trim_start();
+            if trimmed.is_empty() {
                 break;
             }
+            let whitespace_len = remainder.len() - trimmed.len();
+
+            let (token, parsed) = Token::parse(trimmed)?;
+            if token != Token::Comment {
+                stream.push(Spanned::new(
+                    token,
+                    Span {
+                        start: total_parsed + whitespace_len,
+                        end: total_parsed + whitespace_len + parsed,
+                    },
+                ));
+            }
+
+            total_parsed += parsed + whitespace_len;
         }
-        stream.push(Token::EOF);
+        stream.push(Spanned::new(
+            Token::EOF,
+            Span {
+                start: s.len(),
+                end: s.len(),
+            },
+        ));
         Ok(stream)
     }
 }
@@ -224,18 +287,33 @@ mod tests {
     fn tokenize() {
         let val = "1;";
         assert_eq!(
-            TokenStream::from_str(val).unwrap().inner,
+            TokenStream::from_str(val)
+                .unwrap()
+                .inner
+                .into_iter()
+                .map(|item| item.as_ref().clone())
+                .collect::<Vec<_>>(),
             vec![Token::Ident("1"), Token::Semi, Token::EOF]
         );
         let val = "foo;";
         assert_eq!(
-            TokenStream::from_str(val).unwrap().inner,
+            TokenStream::from_str(val)
+                .unwrap()
+                .inner
+                .into_iter()
+                .map(|item| item.as_ref().clone())
+                .collect::<Vec<_>>(),
             vec![Token::Ident("foo"), Token::Semi, Token::EOF]
         );
 
         let line = "foo = 5;";
         assert_eq!(
-            TokenStream::from_str(line).unwrap().inner,
+            TokenStream::from_str(line)
+                .unwrap()
+                .inner
+                .into_iter()
+                .map(|item| item.as_ref().clone())
+                .collect::<Vec<_>>(),
             vec![
                 Token::Ident("foo"),
                 Token::Eq,
@@ -248,7 +326,12 @@ mod tests {
         let line = "(foo  + 2) *5;";
 
         assert_eq!(
-            TokenStream::from_str(line).unwrap().inner,
+            TokenStream::from_str(line)
+                .unwrap()
+                .inner
+                .into_iter()
+                .map(|item| item.as_ref().clone())
+                .collect::<Vec<_>>(),
             vec![
                 Token::OpenParen,
                 Token::Ident("foo"),
@@ -267,7 +350,12 @@ mod tests {
     fn underscore() {
         let text = "hello_world";
         assert_eq!(
-            TokenStream::from_str(text).unwrap().inner,
+            TokenStream::from_str(text)
+                .unwrap()
+                .inner
+                .into_iter()
+                .map(|item| item.as_ref().clone())
+                .collect::<Vec<_>>(),
             vec![Token::Ident("hello_world"), Token::EOF]
         )
     }
@@ -276,25 +364,45 @@ mod tests {
     fn str_lit() {
         let txt1 = "\"hello world\"";
         assert_eq!(
-            TokenStream::from_str(txt1).unwrap().inner,
+            TokenStream::from_str(txt1)
+                .unwrap()
+                .inner
+                .into_iter()
+                .map(|item| item.as_ref().clone())
+                .collect::<Vec<_>>(),
             vec![Token::Lit("hello world"), Token::EOF]
         );
 
         let txt2 = "\'hello world\'";
         assert_eq!(
-            TokenStream::from_str(txt2).unwrap().inner,
+            TokenStream::from_str(txt2)
+                .unwrap()
+                .inner
+                .into_iter()
+                .map(|item| item.as_ref().clone())
+                .collect::<Vec<_>>(),
             vec![Token::Lit("hello world"), Token::EOF]
         );
 
         let txt3 = "\"hello world\";";
         assert_eq!(
-            TokenStream::from_str(txt3).unwrap().inner,
+            TokenStream::from_str(txt3)
+                .unwrap()
+                .inner
+                .into_iter()
+                .map(|item| item.as_ref().clone())
+                .collect::<Vec<_>>(),
             vec![Token::Lit("hello world"), Token::Semi, Token::EOF]
         );
 
         let txt4 = "print_str \"hello world\";";
         assert_eq!(
-            TokenStream::from_str(txt4).unwrap().inner,
+            TokenStream::from_str(txt4)
+                .unwrap()
+                .inner
+                .into_iter()
+                .map(|item| item.as_ref().clone())
+                .collect::<Vec<_>>(),
             vec![
                 Token::Ident("print_str"),
                 Token::Lit("hello world"),

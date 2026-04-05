@@ -46,6 +46,7 @@ end_def
 
 
 public begin_def main;
+	cfg !test;
 	not_tested;
 	print_str "hello there, to run the tests, pass --test to the compiler flags";
 end_def

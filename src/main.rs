@@ -32,10 +32,10 @@ struct ParserImpl {
     #[arg(short, long, default_value_t = 1)]
     verbosity: u8,
 
-    #[arg(short, long, default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     clean: bool,
 
-    #[arg(short, long, default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     test: bool,
 
     #[arg(long = "cfg", value_name = "SPEC")]
@@ -95,6 +95,8 @@ fn main() {
 
     print_if!(1, "compiling {} files...", files.len());
 
+    let mut fatal_err = false;
+
     for (ext, files) in &files {
         if !["asm", "o", &args.extension].contains(&ext.as_ref()) {
             continue;
@@ -130,8 +132,17 @@ fn main() {
                 let mut s = String::new();
                 File::open(file).unwrap().read_to_string(&mut s).unwrap();
 
-                let ast = get_ast(&s, &cfg_env).unwrap();
+                let (ast, diagnostics) = get_ast(&s, &cfg_env);
                 print_if!(2, "AST for {}: {}", f_name, ast);
+
+                if !diagnostics.errs.is_empty() {
+                    fatal_err = true;
+
+                    for e in diagnostics.errs {
+                        e.report(file.to_str().unwrap(), &s);
+                    }
+                    continue;
+                }
 
                 let code = backend::generate(&ast).unwrap();
                 print_if!(2, "IR for {}: {:#?}", f_name, code);
@@ -150,6 +161,11 @@ fn main() {
             }
             obj_files.push(obj_path);
         }
+    }
+
+    if fatal_err {
+        print_if!(0, "Compilation failed due to errors");
+        return;
     }
 
     let final_binary = target_dir.join(&args.output);

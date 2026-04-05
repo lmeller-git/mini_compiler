@@ -1,8 +1,12 @@
 use std::fmt::{Debug, Display};
 
+use ariadne::{Label, Report, Source};
 use indexmap::IndexMap;
 
-use crate::frontend::cfg::CfgEnv;
+use crate::frontend::{
+    cfg::CfgEnv,
+    lexer::{Span, Spanned},
+};
 
 use super::lexer::{Token, TokenStream};
 
@@ -15,26 +19,56 @@ macro_rules! parse_list {
     ) => {{
         let mut items = Vec::new();
 
-        loop {
-            let peeked = $stream.peek();
+        if let Some(e) = loop {
+            let peeked = $stream.peek().as_ref();
 
             if matches!(*peeked, $end_tok) {
-                break;
+                break None;
             }
             let $item_pat = peeked else {
-                return Err(AstErr::BadToken(peeked.to_string()));
+                break Some(
+                    AstErr::UnexpectedToken {
+                        expected: vec![],
+                        found: $stream.peek().clone(),
+                    }
+                    .at($stream.last_span.clone()),
+                );
             };
 
             items.push($extract);
             $stream.advance();
 
-            if matches!(*$stream.peek(), $sep_tok) {
+            if matches!(*$stream.peek().as_ref(), $sep_tok) {
                 $stream.advance();
             }
+        } {
+            Err(e)
+        } else {
+            $stream.advance();
+            Ok(items)
         }
-        $stream.advance();
-        items
     }};
+}
+
+macro_rules! expect_token {
+    (
+        $stream:expr,
+        $diagnostics:expr,
+        $expected:pat
+    ) => {
+        let _tok = $stream.peek();
+        if !matches!(*_tok.as_ref(), $expected) {
+            $diagnostics.errs.push(
+                AstErr::UnclosedBlock {
+                    at: _tok.clone(),
+                    expected: Token::Semi,
+                }
+                .at($stream.last_span.clone()),
+            )
+        } else {
+            $stream.advance();
+        }
+    };
 }
 
 macro_rules! skip_until {
@@ -42,53 +76,76 @@ macro_rules! skip_until {
         $stream:expr,
         $stop_at:pat
     ) => {
-        while !matches!(*$stream.peek(), $stop_at | Token::EOF) {
+        while !matches!(*$stream.peek().as_ref(), $stop_at | Token::EOF) {
             $stream.advance();
         }
     };
 }
 
-fn parse_expr(stream: &mut TokenStream, min_bp: f32) -> Result<Expr, AstErr> {
-    let mut lhs = match stream.peek() {
-        Token::Ident(_) | Token::Lit(_) => Expr::Val(Val::parse(stream)?),
+fn parse_expr<'a>(
+    stream: &mut TokenStream<'a>,
+    min_bp: f32,
+    diagnostics: &mut Diagnostics<'a>,
+) -> Expr {
+    let mut lhs = match stream.peek().as_ref() {
+        Token::Ident(_) | Token::Lit(_) => Expr::Val(Val::parse(stream, diagnostics)),
+        Token::Semi | Token::Comma | Token::EOF | Token::CloseParen => {
+            diagnostics.errs.push(
+                AstErr::UnexpectedToken {
+                    expected: vec![
+                        Token::Star,
+                        Token::Ampercent,
+                        Token::Not,
+                        Token::OpenParen,
+                        Token::Ident(""),
+                        Token::Lit(""),
+                    ],
+                    found: stream.peek().clone(),
+                }
+                .at(stream.peek().span.clone()),
+            );
+            return Expr::Malformed;
+        }
         Token::OpenParen => {
             stream.advance();
-            let lhs = parse_expr(stream, 0.)?;
-            let Token::CloseParen = stream.next() else {
-                return Err(AstErr::BadToken(stream.peek().to_string()));
-            };
+            let lhs = parse_expr(stream, 0., diagnostics);
+            if let Token::CloseParen = stream.peek().as_ref() {
+                stream.advance();
+            } else {
+                diagnostics.errs.push(
+                    AstErr::UnclosedBlock {
+                        at: stream.peek().clone(),
+                        expected: Token::CloseParen,
+                    }
+                    .at(stream.last_span.clone()),
+                );
+            }
             lhs
         }
-        tok => {
-            let op = Operation::from_token_as_single(tok)?;
+        _tok => {
+            let op = Operation::from_token_as_single(stream.peek(), diagnostics);
             stream.advance();
-            let rhs = parse_expr(stream, op.infix_power().0)?;
+            let rhs = parse_expr(stream, op.infix_power().0, diagnostics);
             Expr::Op(Box::new(Expr::Val(Val::V(0))), op, Box::new(rhs))
         }
     };
-    loop {
-        match stream.peek() {
-            Token::EOF | Token::CloseParen | Token::Semi | Token::Comma => break,
-            Token::Ident(_) | Token::Lit(_) => {
-                return Err(AstErr::BadToken(stream.peek().to_string()));
-            }
-            tok => {
-                let op = Operation::from_token(tok)?;
-                let (l, r) = op.infix_power();
-                if r < min_bp {
-                    break;
-                }
-                stream.advance();
-                let rhs = parse_expr(stream, l)?;
-                lhs = Expr::Op(Box::new(lhs), op, Box::new(rhs));
-            }
+    while let Some(op) = Operation::try_from_token(stream.peek()) {
+        let (l, r) = op.infix_power();
+        if r < min_bp {
+            break;
         }
+        stream.advance();
+        let rhs = parse_expr(stream, l, diagnostics);
+        lhs = Expr::Op(Box::new(lhs), op, Box::new(rhs));
     }
-    Ok(lhs)
+    lhs
 }
 
-pub(crate) fn is_func(funcs: &IndexMap<String, Function>, ident: &str) -> bool {
-    funcs.contains_key(ident) || is_builtin_func(ident)
+pub(crate) fn is_func(funcs: &IndexMap<String, Item>, ident: &str) -> bool {
+    funcs
+        .get(ident)
+        .is_some_and(|item| matches!(item, Item::Function(_)))
+        || is_builtin_func(ident)
 }
 
 pub(crate) fn is_builtin_func(ident: &str) -> bool {
@@ -99,53 +156,99 @@ pub(crate) fn is_builtin_func(ident: &str) -> bool {
 }
 
 pub struct Ast {
-    functions: IndexMap<String, Function>,
+    functions: IndexMap<String, Item>,
 }
 
 impl Ast {
-    pub fn from_stream(s: &mut TokenStream, cfg_env: &CfgEnv) -> Self {
+    pub fn from_stream<'a>(s: &mut TokenStream<'a>, cfg_env: &CfgEnv) -> (Self, Diagnostics<'a>) {
+        let mut diagnostics = Diagnostics::new();
         let mut functions = IndexMap::new();
         loop {
-            if let Token::EOF = *s.peek() {
-                break;
-            }
-            if let Token::Keyword("cfg") = *s.peek() {
-                s.advance();
-                let cfg = cfg_env.eval_cfg_expr(&parse_expr(s, 0.).unwrap());
-                s.advance();
-                if !cfg {
-                    skip_until!(
-                        s,
-                        Token::Keyword("begin_def") | Token::Keyword("extern_def")
-                    );
-                    match s.peek() {
-                        Token::Keyword("begin_def") => skip_until!(s, Token::Keyword("end_def")),
-                        Token::Keyword("extern_def") => skip_until!(s, Token::Semi),
-                        Token::EOF => break,
-                        _ => unreachable!(),
+            match s.peek().as_ref() {
+                Token::EOF => break,
+                Token::Keyword("cfg") => {
+                    s.advance();
+                    let cfg = cfg_env.eval_cfg_expr(&parse_expr(s, 0., &mut diagnostics));
+
+                    let _semi = s.peek();
+                    if *_semi.as_ref() != Token::Semi {
+                        diagnostics.errs.push(
+                            AstErr::UnclosedBlock {
+                                at: s.peek().clone(),
+                                expected: Token::Semi,
+                            }
+                            .at(s.last_span.clone()),
+                        );
+                        skip_until!(s, Token::Semi);
                     }
                     s.advance();
-                    continue;
+
+                    if !cfg {
+                        skip_until!(
+                            s,
+                            Token::Keyword("begin_def")
+                                | Token::Keyword("extern_def")
+                                | Token::Keyword("public")
+                        );
+                        match s.peek().as_ref() {
+                            Token::Keyword("begin_def") | Token::Keyword("public") => {
+                                skip_until!(s, Token::Keyword("end_def"))
+                            }
+                            Token::Keyword("extern_def") => skip_until!(s, Token::Semi),
+                            Token::EOF => {
+                                diagnostics
+                                    .errs
+                                    .push(AstErr::UnexecpectedEOF.at(s.last_span.clone()));
+                            }
+                            _ => unreachable!(),
+                        }
+                        s.advance();
+                        continue;
+                    }
+                }
+                Token::Keyword(kw)
+                    if matches!(*kw, "link_attr" | "begin_def" | "public" | "extern_def") =>
+                {
+                    let link_attr = LinkAttr::parse(s, &mut diagnostics);
+
+                    if let Some(f) =
+                        Function::parse(&functions, s, link_attr, cfg_env, &mut diagnostics)
+                    {
+                        functions.insert(f.name.clone(), Item::Function(f));
+                    } else {
+                        functions.insert(
+                            format!("<__malformed_{}>", diagnostics.errs.len()),
+                            Item::Malformed,
+                        );
+                    }
+                }
+                _invalid => {
+                    diagnostics.errs.push(
+                        AstErr::UnexpectedToken {
+                            expected: vec![
+                                Token::Keyword("cfg"),
+                                Token::Keyword("begin_def"),
+                                Token::Keyword("public"),
+                                Token::Keyword("link_attr"),
+                            ],
+                            found: s.peek().clone(),
+                        }
+                        .at(s.peek().span.clone()),
+                    );
+                    skip_until!(
+                        s,
+                        Token::Keyword("begin_def")
+                            | Token::Keyword("public")
+                            | Token::Keyword("cfg")
+                            | Token::Keyword("link_attr")
+                    )
                 }
             }
-
-            let link_attr = match s.peek() {
-                Token::Keyword("link_attr") => LinkAttr::parse(s).unwrap(),
-                _ => LinkAttr::default(),
-            };
-            match Function::parse(&functions, s, link_attr, cfg_env) {
-                Ok(func) => _ = functions.insert(func.name.clone(), func),
-                Err(AstErr::Eof) => break,
-                Err(e) => panic!("err in parse: {:#?}", e),
-            }
-            if *s.peek() == Token::EOF {
-                break;
-            }
         }
-        Self { functions }
+        (Self { functions }, diagnostics)
     }
 
-    pub fn funcs(&self) -> impl Iterator<Item = &Function> {
+    pub fn funcs(&self) -> impl Iterator<Item = &Item> {
         self.functions.values()
     }
 }
@@ -159,11 +262,15 @@ pub struct LinkAttr {
 }
 
 impl LinkAttr {
-    fn parse(stream: &mut TokenStream) -> Result<Self, AstErr> {
+    fn parse<'a>(stream: &mut TokenStream<'a>, diagnostics: &mut Diagnostics<'a>) -> Self {
         let mut zelf = Self::default();
-        while let Token::Keyword("link_attr") = stream.peek() {
+        while let Token::Keyword("link_attr") = stream.peek().as_ref() {
             stream.advance();
-            match (stream.peekn(0), stream.peekn(1), stream.peekn(2)) {
+            match (
+                stream.peek().as_ref(),
+                stream.peekn(1).as_ref(),
+                stream.peekn(2).as_ref(),
+            ) {
                 (Token::Ident("section"), Token::Ident(sec), _) => {
                     zelf = zelf.with_section(sec.to_string());
                     stream.advance();
@@ -179,7 +286,21 @@ impl LinkAttr {
                     match next {
                         Token::Ident("public") => zelf = zelf.into_pub(),
                         Token::Ident("private") => zelf.is_public = false,
-                        tok => return Err(AstErr::BadToken(tok.to_string())),
+                        _tok => {
+                            diagnostics.errs.push(SpannedErr {
+                                err: AstErr::UnexpectedToken {
+                                    expected: vec![
+                                        Token::Keyword("public"),
+                                        Token::Keyword("private"),
+                                    ],
+                                    found: stream.peekn(1).clone(),
+                                },
+                                span: stream.last_span.clone(),
+                            });
+                            skip_until!(stream, Token::Semi);
+                            stream.advance();
+                            continue;
+                        }
                     }
                     stream.advance();
                     stream.advance();
@@ -188,17 +309,43 @@ impl LinkAttr {
                     zelf = zelf.into_external();
                     stream.advance();
                 }
-                (tok, _, _) => return Err(AstErr::BadToken(tok.to_string())),
+                (_tok, _, _) => {
+                    diagnostics.errs.push(SpannedErr {
+                        err: AstErr::UnexpectedToken {
+                            expected: vec![
+                                Token::Keyword("section"),
+                                Token::Keyword("raw"),
+                                Token::Keyword("vis"),
+                            ],
+                            found: stream.peek().clone(),
+                        },
+                        span: stream.last_span.clone(),
+                    });
+                    skip_until!(stream, Token::Semi);
+                    stream.advance();
+                    continue;
+                }
             }
 
             let _tok = stream.peek();
-            let Token::Semi = _tok else {
-                return Err(AstErr::BadToken(_tok.to_string()));
-            };
-            stream.advance();
+            if *_tok.as_ref() != Token::Semi {
+                diagnostics.errs.push(SpannedErr {
+                    err: AstErr::UnclosedBlock {
+                        at: _tok.clone(),
+                        expected: Token::Semi,
+                    },
+                    span: stream.last_span.clone(),
+                });
+                skip_until!(
+                    stream,
+                    Token::Keyword("begin_def") | Token::Keyword("extern_def")
+                );
+            } else {
+                stream.advance();
+            }
         }
 
-        Ok(zelf)
+        zelf
     }
 
     fn into_external(mut self) -> Self {
@@ -239,6 +386,13 @@ pub enum LinkMeta {
     #[default]
     WithMeta,
 }
+
+#[derive(Debug)]
+pub enum Item {
+    Function(Function),
+    Malformed,
+}
+
 #[derive(Debug)]
 pub struct Function {
     pub name: String,
@@ -248,24 +402,34 @@ pub struct Function {
 }
 
 impl Function {
-    fn parse(
-        funcs: &IndexMap<String, Function>,
-        stream: &mut TokenStream,
+    fn parse<'a>(
+        funcs: &IndexMap<String, Item>,
+        stream: &mut TokenStream<'a>,
         mut link_attr: LinkAttr,
         cfg_env: &CfgEnv,
-    ) -> Result<Self, AstErr> {
+        diagnostics: &mut Diagnostics<'a>,
+    ) -> Option<Self> {
         let mut kw = stream.peek();
 
-        let is_public = *kw == Token::Keyword("public");
+        let is_public = *kw.as_ref() == Token::Keyword("public");
         if is_public {
             stream.advance();
             kw = stream.peek();
             link_attr = link_attr.into_pub();
         }
-        let has_body = match kw {
+        let has_body = match kw.as_ref() {
             Token::Keyword("extern_def") => false,
             Token::Keyword("begin_def") => true,
-            _ => return Err(AstErr::BadToken(kw.to_string())),
+            _tok => {
+                diagnostics.errs.push(
+                    AstErr::UnexpectedToken {
+                        expected: vec![Token::Keyword("extern_def"), Token::Keyword("begin_def")],
+                        found: kw.clone(),
+                    }
+                    .at(stream.last_span.clone()),
+                );
+                return None;
+            }
         };
 
         if !has_body {
@@ -275,25 +439,40 @@ impl Function {
         stream.advance();
 
         let ident = stream.peek();
-        let Token::Ident(ident) = ident else {
-            return Err(AstErr::BadToken(ident.to_string()));
+        let Token::Ident(_ident) = ident.as_ref() else {
+            diagnostics.errs.push(
+                AstErr::UnexpectedToken {
+                    expected: vec![Token::Ident("")],
+                    found: ident.clone(),
+                }
+                .at(stream.last_span.clone()),
+            );
+            return None;
         };
-        let name = ident.to_string();
+        let name = _ident.to_string();
         stream.advance();
 
         let args = parse_list!(stream, Token::Semi, Token::Comma, Token::Ident(ident) => ident.to_string());
 
+        let args = match args {
+            Ok(a) => a,
+            Err(e) => {
+                diagnostics.errs.push(e);
+                Vec::new()
+            }
+        };
+
         let body = if has_body {
             let mut body = Vec::new();
 
-            while *stream.peek() != Token::Keyword("end_def") {
-                if let Token::Keyword("cfg") = stream.peek() {
+            while *stream.peek().as_ref() != Token::Keyword("end_def") {
+                if let Token::Keyword("cfg") = stream.peek().as_ref() {
                     stream.advance();
-                    let cfg = cfg_env.eval_cfg_expr(&parse_expr(stream, 0.).unwrap());
+                    let cfg = cfg_env.eval_cfg_expr(&parse_expr(stream, 0., diagnostics));
                     stream.advance();
                     if !cfg {
                         loop {
-                            let tok_is_if = *stream.peek() == Token::Keyword("if");
+                            let tok_is_if = *stream.peek().as_ref() == Token::Keyword("if");
                             skip_until!(stream, Token::Semi);
                             stream.advance();
                             if !tok_is_if {
@@ -303,8 +482,18 @@ impl Function {
                         continue;
                     }
                 }
-                let line = Line::parse(funcs, stream)?;
+                let line = Line::parse(funcs, stream, diagnostics);
                 body.push(line);
+                if *stream.peek().as_ref() == Token::EOF {
+                    diagnostics.errs.push(
+                        AstErr::UnclosedBlock {
+                            at: stream.peek().clone(),
+                            expected: Token::Keyword("end_def"),
+                        }
+                        .at(stream.peek().span.clone()),
+                    );
+                    break;
+                }
             }
             stream.advance();
             Some(body)
@@ -312,7 +501,7 @@ impl Function {
             None
         };
 
-        Ok(Self {
+        Some(Self {
             name,
             body,
             args,
@@ -330,12 +519,14 @@ pub enum Line {
     Decl(LValue, Expr),
     Call(String, Vec<Expr>),
     Cond(Expr, Box<Line>),
+    Malformed,
 }
 
 #[derive(Debug)]
 pub enum Expr {
     Val(Val),
     Op(Box<Expr>, Operation, Box<Expr>),
+    Malformed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -354,11 +545,16 @@ impl Display for LValue {
 }
 
 impl LValue {
-    fn from_tokens(stream: &mut TokenStream) -> Result<Self, AstErr> {
-        match stream.peek() {
+    fn from_tokens<'a>(stream: &mut TokenStream<'a>) -> Result<Self, SpannedErr<'a>> {
+        // TODO this should be refactored along with Line::expr/func_cal/decl
+        match stream.peek().as_ref() {
             Token::Ident(i) => {
-                let Token::Eq = stream.peekn(1) else {
-                    return Err(AstErr::BadToken(stream.peekn(1).to_string()));
+                let Token::Eq = stream.peekn(1).as_ref() else {
+                    return Err(AstErr::UnexpectedToken {
+                        expected: vec![],
+                        found: stream.peek().clone(),
+                    }
+                    .at(stream.last_span.clone()));
                 };
                 let ident = i.to_string();
                 stream.advance();
@@ -369,7 +565,11 @@ impl LValue {
                 let inner = Self::from_tokens(stream)?;
                 Ok(Self::Deref(Box::new(inner)))
             }
-            tok => Err(AstErr::BadToken(tok.to_string())),
+            _tok => Err(AstErr::UnexpectedToken {
+                expected: vec![],
+                found: stream.peek().clone(),
+            }
+            .at(stream.last_span.clone())),
         }
     }
 }
@@ -393,6 +593,7 @@ pub enum Operation {
     BitXOR,
     Shr,
     Shl,
+    Malformed,
 }
 
 impl Operation {
@@ -407,20 +608,30 @@ impl Operation {
             Self::BitXOR => (1.5, 1.6),
             Self::BitOR => (1.4, 1.5),
             Self::Gt | Self::Lt | Self::EqEq | Self::NEq => (1., 1.1),
+            Self::Malformed => (0., 0.1),
         }
     }
 
-    fn from_token_as_single(token: &Token<'_>) -> Result<Self, AstErr> {
-        Ok(match token {
+    fn from_token_as_single<'a>(token: &Spanned<'a>, diagnostics: &mut Diagnostics<'a>) -> Self {
+        match token.as_ref() {
             Token::Star => Self::Load,
             Token::Ampercent => Self::AsRef,
             Token::Not => Self::Not,
-            tok => return Err(AstErr::BadToken(tok.to_string())),
-        })
+            _tok => {
+                diagnostics.errs.push(
+                    AstErr::UnexpectedToken {
+                        expected: vec![Token::Star, Token::Ampercent, Token::Not],
+                        found: token.clone(),
+                    }
+                    .at(token.span.clone()),
+                );
+                Self::Malformed
+            }
+        }
     }
 
-    fn from_token(token: &Token<'_>) -> Result<Self, AstErr> {
-        Ok(match token {
+    fn try_from_token<'a>(token: &Spanned<'a>) -> Option<Self> {
+        Some(match token.as_ref() {
             Token::Star => Self::Mul,
             Token::Add => Self::Add,
             Token::Sub => Self::Sub,
@@ -436,7 +647,7 @@ impl Operation {
             Token::Lt => Self::Lt,
             Token::EqEq => Self::EqEq,
             Token::NEq => Self::NEq,
-            tok => return Err(AstErr::BadToken(tok.to_string())),
+            _tok => return None,
         })
     }
 }
@@ -446,79 +657,201 @@ pub enum Val {
     Var(String),
     V(i64),
     Lit(String),
+    Malformed,
+}
+
+#[derive(Debug)]
+pub struct Diagnostics<'a> {
+    pub errs: Vec<SpannedErr<'a>>,
+}
+
+impl<'a> Diagnostics<'a> {
+    fn new() -> Self {
+        Self { errs: Vec::new() }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AstErr {
-    BadToken(String),
-    Eof,
+pub struct SpannedErr<'a> {
+    pub err: AstErr<'a>,
+    pub span: Span,
+}
+
+impl<'a> SpannedErr<'a> {
+    pub fn report(&self, file: &str, source: &str) {
+        let mut report = Report::build(
+            ariadne::ReportKind::Error,
+            (file, self.span.start..self.span.end),
+        );
+
+        report = match &self.err {
+            AstErr::UnexecpectedEOF => report.with_message("unexpected EOF"),
+            AstErr::UnclosedBlock { at, expected } => report
+                .with_message("unclosed code block")
+                .with_label(
+                    Label::new((file, at.span.start..at.span.end))
+                        .with_message(format!("expected {}", expected)),
+                )
+                .with_label(
+                    Label::new((file, self.span.start..self.span.end))
+                        .with_message("while parsing this block"),
+                ),
+            AstErr::UnexpectedToken { expected, found } => report
+                .with_message("unexpected token")
+                .with_label(
+                    Label::new((file, found.span.start..found.span.end)).with_message(format!(
+                        "expected one of {:?}, found {}",
+                        expected, found.token
+                    )),
+                )
+                .with_label(
+                    Label::new((file, self.span.start..self.span.end))
+                        .with_message("while parsing this block"),
+                ),
+            AstErr::UndefinedFunctionCall { name } => report
+                .with_message(format!("tried to call undefined function {}", name))
+                .with_label(Label::new((file, self.span.start..self.span.end)))
+                .with_help("functions must be defined above the call site"),
+        };
+        report.finish().print((file, Source::from(source))).unwrap();
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AstErr<'a> {
+    UnexecpectedEOF,
+    UnclosedBlock {
+        at: Spanned<'a>,
+        expected: Token<'a>,
+    },
+    UnexpectedToken {
+        expected: Vec<Token<'a>>,
+        found: Spanned<'a>,
+    },
+    UndefinedFunctionCall {
+        name: String,
+    },
+}
+
+impl<'a> AstErr<'a> {}
+
+impl<'a> AstErr<'a> {
+    fn at(self, span: Span) -> SpannedErr<'a> {
+        SpannedErr { err: self, span }
+    }
 }
 
 impl Line {
-    fn parse(funcs: &IndexMap<String, Function>, stream: &mut TokenStream) -> Result<Self, AstErr> {
-        let r = match stream.peek() {
+    fn parse<'a>(
+        funcs: &IndexMap<String, Item>,
+        stream: &mut TokenStream<'a>,
+        diagnostics: &mut Diagnostics<'a>,
+    ) -> Self {
+        let r = match stream.peek().as_ref() {
             Token::Ident(i) => match i {
                 i if is_func(funcs, i) => {
                     let i = i.to_string();
+                    let anchor = stream.peek().span.clone();
                     stream.advance();
                     let mut exprs = Vec::new();
-                    while *stream.peek() != Token::Semi {
-                        exprs.push(parse_expr(stream, 0.)?);
-                        if let Token::Comma = stream.peek() {
+                    while *stream.peek().as_ref() != Token::Semi {
+                        exprs.push(parse_expr(stream, 0., diagnostics));
+                        let next = stream.peek();
+                        if *next.as_ref() == Token::Comma {
                             stream.advance();
+                        } else if *next.as_ref() != Token::Semi {
+                            println!("{:?}", anchor);
+                            diagnostics.errs.push(
+                                AstErr::UnclosedBlock {
+                                    at: next.clone(),
+                                    expected: Token::Semi,
+                                }
+                                .at(anchor.clone()),
+                            );
+                            skip_until!(stream, Token::Comma | Token::Semi);
+                            if *stream.peek().as_ref() == Token::Comma {
+                                stream.advance();
+                            }
                         }
                     }
-                    Ok(Self::Call(i, exprs))
+                    Self::Call(i, exprs)
                 }
                 _i => {
+                    let name = _i.to_string();
                     if let Ok(l) = LValue::from_tokens(stream) {
                         stream.advance();
-                        Ok(Self::Decl(l, parse_expr(stream, 0.)?))
+                        Self::Decl(l, parse_expr(stream, 0., diagnostics))
                     } else {
-                        Ok(Self::Expr(parse_expr(stream, 0.)?))
+                        diagnostics.errs.push(
+                            AstErr::UndefinedFunctionCall { name }.at(stream.peek().span.clone()),
+                        );
+                        skip_until!(stream, Token::Semi);
+                        Self::Malformed
                     }
                 }
             },
             Token::Star => {
                 if let Ok(l) = LValue::from_tokens(stream) {
                     stream.advance();
-                    Ok(Self::Decl(l, parse_expr(stream, 0.)?))
+                    Self::Decl(l, parse_expr(stream, 0., diagnostics))
                 } else {
-                    Ok(Self::Expr(parse_expr(stream, 0.)?))
+                    Self::Expr(parse_expr(stream, 0., diagnostics))
                 }
             }
             Token::Keyword(kw) if matches!(kw, &"if") => {
                 stream.advance();
-                let cond = parse_expr(stream, 0.)?;
-                let _semi = stream.next();
-                let Token::Semi = _semi else {
-                    return Err(AstErr::BadToken(_semi.to_string()));
-                };
+                let cond = parse_expr(stream, 0., diagnostics);
 
-                let then = Self::parse(funcs, stream)?;
-                return Ok(Self::Cond(cond, Box::new(then)));
+                expect_token!(stream, diagnostics, Token::Semi);
+
+                let then = Self::parse(funcs, stream, diagnostics);
+                return Self::Cond(cond, Box::new(then));
             }
-            Token::EOF => return Err(AstErr::Eof),
-            _ => Ok(Self::Expr(parse_expr(stream, 0.)?)),
+            Token::EOF => {
+                diagnostics
+                    .errs
+                    .push(AstErr::UnexecpectedEOF.at(stream.peek().span.clone()));
+                return Self::Malformed;
+            }
+            _ => Self::Expr(parse_expr(stream, 0., diagnostics)),
         };
-        let _semi = stream.next();
-        let Token::Semi = _semi else {
-            return Err(AstErr::BadToken(_semi.to_string()));
-        };
+        let tok = stream.peek();
+        if *tok.as_ref() != Token::Semi {
+            diagnostics.errs.push(
+                AstErr::UnclosedBlock {
+                    at: tok.clone(),
+                    expected: Token::Semi,
+                }
+                .at(stream.last_span.clone()),
+            );
+            skip_until!(stream, Token::Semi);
+        }
+        stream.advance();
         r
     }
 }
 
 impl Val {
-    fn parse(stream: &mut TokenStream) -> Result<Self, AstErr> {
-        Ok(match stream.next() {
+    fn parse<'a>(stream: &mut TokenStream<'a>, diagnostics: &mut Diagnostics<'a>) -> Self {
+        let zelf = match stream.peek().as_ref() {
             Token::Ident(t) => t
                 .parse::<i64>()
                 .map(Self::V)
                 .unwrap_or(Self::Var(t.to_string())),
             Token::Lit(t) => Self::Lit(t.to_string()),
-            tok => return Err(AstErr::BadToken(tok.to_string())),
-        })
+            _tok => {
+                diagnostics.errs.push(
+                    AstErr::UnexpectedToken {
+                        expected: vec![Token::Ident(""), Token::Lit("")],
+                        found: stream.peek().clone(),
+                    }
+                    .at(stream.peek().span.clone()),
+                );
+                return Self::Malformed;
+            }
+        };
+        stream.advance();
+        zelf
     }
 }
 
@@ -547,6 +880,7 @@ impl Display for Val {
             Self::Var(i) => write!(f, "{}", i),
             Self::V(v) => write!(f, "{}", v),
             Self::Lit(lit) => write!(f, "{}", lit),
+            Self::Malformed => write!(f, "malformed"),
         }
     }
 }
@@ -571,6 +905,7 @@ impl Display for Operation {
             Self::Shr => write!(f, ">>"),
             Self::Shl => write!(f, "<<"),
             Self::NEq => write!(f, "!="),
+            Self::Malformed => write!(f, "malformed"),
         }
     }
 }
@@ -580,6 +915,7 @@ impl Display for Expr {
         match self {
             Self::Val(v) => write!(f, "{}", v),
             Self::Op(lhs, op, rhs) => write!(f, "({} {} {})", lhs.as_ref(), op, rhs.as_ref()),
+            Self::Malformed => write!(f, "malformed"),
         }
     }
 }
@@ -599,6 +935,16 @@ impl Display for Line {
                     .join(",")
             ),
             Self::Cond(c, e) => write!(f, "if {}; {}", c, e),
+            Self::Malformed => write!(f, "malformed"),
+        }
+    }
+}
+
+impl Display for Item {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Function(func) => write!(f, "{}", func),
+            Self::Malformed => write!(f, "malformed"),
         }
     }
 }
@@ -623,14 +969,14 @@ mod tests {
           x = 1+ 2;
           print x * (5+2);
           y = x / (3 + 2);
-          x + y / 5 * 4;
+          k = x + y / 5 * 4;
           end_def
         ";
         let mut stream = TokenStream::from_str(s).unwrap();
         let ast = Ast::from_stream(&mut stream, &CfgEnv::default());
         assert_eq!(
-            format!("{}", ast),
-            "fn main() {\ndeclare x = (1 + 2);\ncall print (x * (5 + 2));\ndeclare y = (x / (3 + 2));\n(x + ((y / 5) * 4));\n};\n"
+            format!("{}", ast.0),
+            "fn main() {\ndeclare x = (1 + 2);\ncall print (x * (5 + 2));\ndeclare y = (x / (3 + 2));\ndeclare k = (x + ((y / 5) * 4));\n};\n"
         )
     }
 }
