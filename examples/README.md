@@ -44,7 +44,7 @@ cargo run --release -- examples/bit_wise.lang
 small cli script that tells you wether a number is prime or not
 
 ```bash
-cargo run --release -- examples/prime.lang lib/std/utils.lang lib/std/math.lang
+cargo run --release -- examples/prime.lang
 ./target/a.out
 ```
 
@@ -68,7 +68,7 @@ cargo run --release --examples/statically
 ffi calls into glibc + heap usage
 
 ```bash
-cargo run --release -- examples/malloc.lang lib/std/array.lang lib/std/utils.lang lib/std/ffi.asm
+cargo run --release -- examples/malloc.lang
 ./target/a.out
 ```
 
@@ -76,7 +76,7 @@ cargo run --release -- examples/malloc.lang lib/std/array.lang lib/std/utils.lan
 basic vector usage
 
 ```bash
-cargo run --release -- lib/std/collections/vec.lang lib/std/mem.lang lib/std/utils.lang examples/vec.lang lib/std/ffi.asm
+cargo run --release -- examples/vec.lang
 ./target/a.out
 ```
 
@@ -84,7 +84,7 @@ cargo run --release -- lib/std/collections/vec.lang lib/std/mem.lang lib/std/uti
 basic dynamic strings
 
 ```bash
-cargo run --release -- examples/string.lang lib
+cargo run --release -- examples/string.lang
 ./target/a.out
 ```
 
@@ -92,7 +92,7 @@ cargo run --release -- examples/string.lang lib
 basic linked_list usage
 
 ```bash
-cargo run --release -- examples/linked_list.lang lib
+cargo run --release -- examples/linked_list.lang
 ./target/a.out
 ```
 
@@ -100,13 +100,13 @@ cargo run --release -- examples/linked_list.lang lib
 defining and running tests
 
 ```bash
-cargo run --release -- examples/test.lang lib --test
+cargo run --release -- examples/test.lang --test
 ./target/a.out
 ```
 
 Of course this may also be run as a normal executable:
 
 ```bash
-cargo run --release -- examples/test.lang lib
+cargo run --release -- examples/test.lang
 ./target/a.out
 ```

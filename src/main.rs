@@ -40,6 +40,9 @@ struct ParserImpl {
 
     #[arg(long = "cfg", value_name = "SPEC")]
     cfgs: Vec<String>,
+
+    #[arg(long, default_value_t = false)]
+    no_std: bool,
 }
 
 fn main() {
@@ -91,6 +94,11 @@ fn main() {
     if args.test {
         let test_lib: PathBuf = format!("{}/lib/testing", repo_root).into();
         recursive_collect(&test_lib, &mut files);
+    }
+
+    if !args.no_std {
+        let std_lib: PathBuf = format!("{}/lib/std", repo_root).into();
+        recursive_collect(&std_lib, &mut files);
     }
 
     print_if!(1, "compiling {} files...", files.len());
