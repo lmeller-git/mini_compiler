@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::frontend::ast::{Expr, Operation};
+use crate::frontend::ast::{Expr, Operation, Val};
 
 #[derive(Debug)]
 pub struct CfgEnv {
@@ -25,7 +25,7 @@ impl CfgEnv {
     pub fn eval_cfg_expr(&self, expr: &Expr) -> bool {
         match expr {
             Expr::Val(v) => match v {
-                super::ast::Val::Lit(str) => {
+                Val::Lit(str) => {
                     if let Some((key, value)) = str.split_once('=') {
                         self.mappings.get(key).is_some_and(|v| v == value)
                     } else {

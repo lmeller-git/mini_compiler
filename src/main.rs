@@ -10,7 +10,7 @@ use std::{
 use clap::Parser;
 use mini_compiler::{
     VERBOSITY, backend,
-    frontend::{cfg::CfgEnv, get_ast},
+    frontend::{ast::cfg::CfgEnv, get_ast},
     print_if,
 };
 

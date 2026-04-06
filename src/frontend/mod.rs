@@ -2,12 +2,11 @@ use ast::Ast;
 use lexer::{LexErr, TokenStream};
 
 use crate::{
-    frontend::{ast::Diagnostics, cfg::CfgEnv},
+    frontend::ast::{cfg::CfgEnv, error::Diagnostics},
     print_if,
 };
 
 pub mod ast;
-pub mod cfg;
 mod lexer;
 
 pub fn get_ast<'a>(s: &'a str, cfg_env: &CfgEnv) -> (Ast, Diagnostics<'a>) {

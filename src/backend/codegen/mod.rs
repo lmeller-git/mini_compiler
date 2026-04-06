@@ -306,7 +306,7 @@ impl CodeBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::frontend::{cfg::CfgEnv, get_ast};
+    use crate::frontend::{ast::cfg::CfgEnv, get_ast};
 
     #[test]
     fn code() {
