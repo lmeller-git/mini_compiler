@@ -47,6 +47,13 @@ pub struct Span {
     pub end: usize,
 }
 
+impl Span {
+    pub fn merge(mut self, other: Span) -> Self {
+        self.end = other.end;
+        self
+    }
+}
+
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token<'a> {

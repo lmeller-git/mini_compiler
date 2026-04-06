@@ -13,6 +13,7 @@ use super::lexer::{Token, TokenStream};
 macro_rules! parse_list {
     (
         $stream:expr,
+        $anchor:expr,
         $end_tok:pat,
         $sep_tok:pat,
         $item_pat:pat => $extract:expr
@@ -31,7 +32,7 @@ macro_rules! parse_list {
                         expected: vec![],
                         found: $stream.peek().clone(),
                     }
-                    .at($stream.last_span.clone()),
+                    .at($anchor.clone().merge($stream.last_span.clone())),
                 );
             };
 
@@ -54,20 +55,38 @@ macro_rules! expect_token {
     (
         $stream:expr,
         $diagnostics:expr,
-        $expected:pat
+        $anchor:expr,
+        $expected:expr
     ) => {
         let _tok = $stream.peek();
-        if !matches!(*_tok.as_ref(), $expected) {
+        if !$expected.contains(_tok.as_ref()) {
             $diagnostics.errs.push(
                 AstErr::UnclosedBlock {
                     at: _tok.clone(),
-                    expected: vec![Token::Semi],
+                    expected: $expected.into(),
                 }
-                .at($stream.last_span.clone()),
+                .at($anchor.clone().merge($stream.last_span.clone())),
             )
         } else {
             $stream.advance();
         }
+    };
+}
+
+macro_rules! skip_until_kw {
+    ($stream:expr, $stop_at:pat) => {
+        skip_until!(
+            $stream,
+            $stop_at
+                | Token::EOF
+                | Token::Keyword("begin_def")
+                | Token::Keyword("extern_def")
+                | Token::Keyword("end_def")
+                | Token::Keyword("if")
+                | Token::Keyword("cfg")
+                | Token::Keyword("link_attr")
+                | Token::Keyword("public")
+        )
     };
 }
 
@@ -76,7 +95,7 @@ macro_rules! skip_until {
         $stream:expr,
         $stop_at:pat
     ) => {
-        while !matches!(*$stream.peek().as_ref(), $stop_at | Token::EOF) {
+        while !matches!(*$stream.peek().as_ref(), $stop_at) {
             $stream.advance();
         }
     };
@@ -87,6 +106,7 @@ fn parse_expr<'a>(
     min_bp: f32,
     diagnostics: &mut Diagnostics<'a>,
 ) -> Expr {
+    let anchor = stream.peek().span.clone();
     let mut lhs = match stream.peek().as_ref() {
         Token::Ident(_) | Token::Lit(_) | Token::Number(_) => {
             Expr::Val(Val::parse(stream, diagnostics))
@@ -105,7 +125,7 @@ fn parse_expr<'a>(
                     ],
                     found: stream.peek().clone(),
                 }
-                .at(stream.peek().span.clone()),
+                .at(stream.last_span.clone()),
             );
             return Expr::Malformed;
         }
@@ -123,7 +143,7 @@ fn parse_expr<'a>(
                         at: stream.peek().clone(),
                         expected: vec![Token::CloseParen],
                     }
-                    .at(stream.peek().span.clone()),
+                    .at(anchor.merge(stream.last_span.clone())),
                 );
             }
             lhs
@@ -149,7 +169,7 @@ fn parse_expr<'a>(
                         ],
                         found: stream.peek().clone(),
                     }
-                    .at(stream.peek().span.clone()),
+                    .at(anchor.merge(stream.last_span.clone())),
                 );
                 skip_until!(stream, Token::Semi);
                 Expr::Malformed
@@ -194,6 +214,7 @@ impl Ast {
         let mut diagnostics = Diagnostics::new();
         let mut functions = IndexMap::new();
         loop {
+            let anchor = s.peek().span.clone();
             match s.peek().as_ref() {
                 Token::EOF => break,
                 Token::Keyword("cfg") => {
@@ -207,7 +228,7 @@ impl Ast {
                                 at: s.peek().clone(),
                                 expected: vec![Token::Semi],
                             }
-                            .at(s.last_span.clone()),
+                            .at(anchor.clone().merge(s.last_span.clone())),
                         );
                         skip_until!(s, Token::Semi);
                     }
@@ -226,14 +247,14 @@ impl Ast {
                             }
                             Token::Keyword("extern_def") => skip_until!(s, Token::Semi),
                             Token::EOF => {
-                                diagnostics
-                                    .errs
-                                    .push(AstErr::UnexecpectedEOF.at(s.last_span.clone()));
+                                diagnostics.errs.push(
+                                    AstErr::UnexecpectedEOF
+                                        .at(anchor.clone().merge(s.last_span.clone())),
+                                );
                             }
                             _ => unreachable!(),
                         }
                         s.advance();
-                        continue;
                     }
                 }
                 Token::Keyword(kw)
@@ -250,6 +271,16 @@ impl Ast {
                             format!("<__malformed_{}>", diagnostics.errs.len()),
                             Item::Malformed,
                         );
+                        skip_until!(
+                            s,
+                            Token::Keyword("end_def")
+                                | Token::Keyword("cfg")
+                                | Token::Keyword("link_attr")
+                                | Token::Keyword("begin_def")
+                                | Token::Keyword("extern_def")
+                                | Token::Keyword("public")
+                        );
+                        expect_token!(s, &mut diagnostics, anchor, [Token::Keyword("end_def")]);
                     }
                 }
                 _invalid => {
@@ -263,7 +294,7 @@ impl Ast {
                             ],
                             found: s.peek().clone(),
                         }
-                        .at(s.peek().span.clone()),
+                        .at(anchor),
                     );
                     skip_until!(
                         s,
@@ -295,6 +326,7 @@ impl LinkAttr {
     fn parse<'a>(stream: &mut TokenStream<'a>, diagnostics: &mut Diagnostics<'a>) -> Self {
         let mut zelf = Self::default();
         while let Token::Keyword("link_attr") = stream.peek().as_ref() {
+            let anchor = stream.peek().span.clone();
             stream.advance();
             match (
                 stream.peek().as_ref(),
@@ -317,16 +349,16 @@ impl LinkAttr {
                         Token::Ident("public") => zelf = zelf.into_pub(),
                         Token::Ident("private") => zelf.is_public = false,
                         _tok => {
-                            diagnostics.errs.push(SpannedErr {
-                                err: AstErr::UnexpectedToken {
+                            diagnostics.errs.push(
+                                AstErr::UnexpectedToken {
                                     expected: vec![
                                         Token::Keyword("public"),
                                         Token::Keyword("private"),
                                     ],
                                     found: stream.peekn(1).clone(),
-                                },
-                                span: stream.last_span.clone(),
-                            });
+                                }
+                                .at(anchor.merge(stream.peek().span.clone())),
+                            );
                             skip_until!(stream, Token::Semi);
                             stream.advance();
                             continue;
@@ -340,17 +372,17 @@ impl LinkAttr {
                     stream.advance();
                 }
                 (_tok, _, _) => {
-                    diagnostics.errs.push(SpannedErr {
-                        err: AstErr::UnexpectedToken {
+                    diagnostics.errs.push(
+                        AstErr::UnexpectedToken {
                             expected: vec![
                                 Token::Keyword("section"),
                                 Token::Keyword("raw"),
                                 Token::Keyword("vis"),
                             ],
                             found: stream.peek().clone(),
-                        },
-                        span: stream.last_span.clone(),
-                    });
+                        }
+                        .at(anchor),
+                    );
                     skip_until!(stream, Token::Semi);
                     stream.advance();
                     continue;
@@ -359,16 +391,19 @@ impl LinkAttr {
 
             let _tok = stream.peek();
             if *_tok.as_ref() != Token::Semi {
-                diagnostics.errs.push(SpannedErr {
-                    err: AstErr::UnclosedBlock {
+                diagnostics.errs.push(
+                    AstErr::UnclosedBlock {
                         at: _tok.clone(),
                         expected: vec![Token::Semi],
-                    },
-                    span: stream.last_span.clone(),
-                });
+                    }
+                    .at(anchor.merge(stream.last_span.clone())),
+                );
                 skip_until!(
                     stream,
-                    Token::Keyword("begin_def") | Token::Keyword("extern_def")
+                    Token::Keyword("begin_def")
+                        | Token::Keyword("extern_def")
+                        | Token::Semi
+                        | Token::Keyword("link_attr")
                 );
             } else {
                 stream.advance();
@@ -440,6 +475,7 @@ impl Function {
         diagnostics: &mut Diagnostics<'a>,
     ) -> Option<Self> {
         let mut kw = stream.peek();
+        let anchor = kw.span.clone();
 
         let is_public = *kw.as_ref() == Token::Keyword("public");
         if is_public {
@@ -472,17 +508,17 @@ impl Function {
         let Token::Ident(_ident) = ident.as_ref() else {
             diagnostics.errs.push(
                 AstErr::UnexpectedToken {
-                    expected: vec![Token::Ident("")],
+                    expected: vec![Token::Ident("<function name>")],
                     found: ident.clone(),
                 }
-                .at(stream.last_span.clone()),
+                .at(anchor.merge(stream.last_span.clone())),
             );
             return None;
         };
         let name = _ident.to_string();
         stream.advance();
 
-        let args = parse_list!(stream, Token::Semi, Token::Comma, Token::Ident(ident) => ident.to_string());
+        let args = parse_list!(stream, anchor, Token::Semi, Token::Comma, Token::Ident(ident) => ident.to_string());
 
         let args = match args {
             Ok(a) => a,
@@ -496,6 +532,16 @@ impl Function {
             let mut body = Vec::new();
 
             while *stream.peek().as_ref() != Token::Keyword("end_def") {
+                if matches!(
+                    *stream.peek().as_ref(),
+                    Token::EOF
+                        | Token::Keyword("begin_def")
+                        | Token::Keyword("extern_def")
+                        | Token::Keyword("link_attr")
+                        | Token::Keyword("public")
+                ) {
+                    break;
+                }
                 if let Token::Keyword("cfg") = stream.peek().as_ref() {
                     stream.advance();
                     let cfg = cfg_env.eval_cfg_expr(&parse_expr(stream, 0., diagnostics));
@@ -513,23 +559,29 @@ impl Function {
                     }
                 }
                 let line = Line::parse(funcs, stream, diagnostics);
-                body.push(line);
-                if *stream.peek().as_ref() == Token::EOF {
-                    diagnostics.errs.push(
-                        AstErr::UnclosedBlock {
-                            at: stream.peek().clone(),
-                            expected: vec![Token::Keyword("end_def")],
-                        }
-                        .at(stream.peek().span.clone()),
-                    );
-                    break;
+                if line == Line::Malformed {
+                    skip_until_kw!(stream, Token::Semi);
                 }
+                body.push(line);
             }
-            stream.advance();
             Some(body)
         } else {
             None
         };
+
+        if !has_body || matches!(stream.peek().as_ref(), Token::Keyword("end_def")) {
+            if has_body {
+                stream.advance();
+            }
+        } else {
+            diagnostics.errs.push(
+                AstErr::UnclosedBlock {
+                    at: stream.peek().clone(),
+                    expected: vec![Token::Keyword("end_def")],
+                }
+                .at(anchor.merge(stream.last_span.clone())),
+            );
+        }
 
         Some(Self {
             name,
@@ -544,6 +596,7 @@ impl Function {
     }
 }
 
+#[derive(PartialEq, Eq)]
 pub enum Line {
     Expr(Expr),
     Decl(LValue, Expr),
@@ -681,6 +734,122 @@ pub enum Val {
     Malformed,
 }
 
+impl Line {
+    fn parse<'a>(
+        funcs: &IndexMap<String, Item>,
+        stream: &mut TokenStream<'a>,
+        diagnostics: &mut Diagnostics<'a>,
+    ) -> Self {
+        let anchor = stream.peek().span.clone();
+        let r = match stream.peek().as_ref() {
+            Token::Ident(i) => match i {
+                i if is_func(funcs, i) => {
+                    let i = i.to_string();
+                    stream.advance();
+                    let mut exprs = Vec::new();
+                    while *stream.peek().as_ref() != Token::Semi {
+                        exprs.push(parse_expr(stream, 0., diagnostics));
+                        let next = stream.peek();
+                        if *next.as_ref() == Token::Comma {
+                            stream.advance();
+                        } else if *next.as_ref() != Token::Semi {
+                            diagnostics.errs.push(
+                                AstErr::UnclosedBlock {
+                                    at: next.clone(),
+                                    expected: vec![Token::Semi, Token::Comma],
+                                }
+                                .at(anchor.clone().merge(stream.last_span.clone())),
+                            );
+                            skip_until!(stream, Token::Comma | Token::Semi);
+                            if *stream.peek().as_ref() == Token::Comma {
+                                stream.advance();
+                            }
+                        }
+                    }
+                    Self::Call(i, exprs)
+                }
+                _i => {
+                    let name = _i.to_string();
+                    if let Ok(l) = LValue::from_tokens(stream) {
+                        stream.advance();
+                        Self::Decl(l, parse_expr(stream, 0., diagnostics))
+                    } else {
+                        diagnostics.errs.push(
+                            AstErr::UndefinedFunctionCall { name }.at(stream.peek().span.clone()),
+                        );
+                        skip_until_kw!(stream, Token::Semi);
+                        if *stream.peek().as_ref() == Token::Semi {
+                            stream.advance();
+                        }
+                        return Self::Malformed;
+                    }
+                }
+            },
+            Token::Star => {
+                if let Ok(l) = LValue::from_tokens(stream) {
+                    stream.advance();
+                    Self::Decl(l, parse_expr(stream, 0., diagnostics))
+                } else {
+                    Self::Expr(parse_expr(stream, 0., diagnostics))
+                }
+            }
+            Token::Keyword(kw) if matches!(kw, &"if") => {
+                stream.advance();
+                let cond = parse_expr(stream, 0., diagnostics);
+
+                expect_token!(stream, diagnostics, anchor, [Token::Semi]);
+
+                let then = Self::parse(funcs, stream, diagnostics);
+                return Self::Cond(cond, Box::new(then));
+            }
+            Token::EOF => {
+                diagnostics.errs.push(
+                    AstErr::UnexecpectedEOF.at(anchor.clone().merge(stream.peek().span.clone())),
+                );
+                return Self::Malformed;
+            }
+            _ => Self::Expr(parse_expr(stream, 0., diagnostics)),
+        };
+        let tok = stream.peek();
+        if *tok.as_ref() != Token::Semi {
+            diagnostics.errs.push(
+                AstErr::UnclosedBlock {
+                    at: tok.clone(),
+                    expected: vec![Token::Semi],
+                }
+                .at(anchor.merge(stream.last_span.clone())),
+            );
+            skip_until_kw!(stream, Token::Semi);
+        }
+        if *stream.peek().as_ref() == Token::Semi {
+            stream.advance();
+        }
+        r
+    }
+}
+
+impl Val {
+    fn parse<'a>(stream: &mut TokenStream<'a>, diagnostics: &mut Diagnostics<'a>) -> Self {
+        let zelf = match stream.peek().as_ref() {
+            Token::Ident(t) => Self::Var(t.to_string()),
+            Token::Number(num) => Self::V(*num),
+            Token::Lit(t) => Self::Lit(t.to_string()),
+            _tok => {
+                diagnostics.errs.push(
+                    AstErr::UnexpectedToken {
+                        expected: vec![Token::Ident("<ident>"), Token::Lit("<strlit>")],
+                        found: stream.peek().clone(),
+                    }
+                    .at(stream.last_span.clone()),
+                );
+                return Self::Malformed;
+            }
+        };
+        stream.advance();
+        zelf
+    }
+}
+
 #[derive(Debug)]
 pub struct Diagnostics<'a> {
     pub errs: Vec<SpannedErr<'a>>,
@@ -759,117 +928,6 @@ impl<'a> AstErr<'a> {}
 impl<'a> AstErr<'a> {
     fn at(self, span: Span) -> SpannedErr<'a> {
         SpannedErr { err: self, span }
-    }
-}
-
-impl Line {
-    fn parse<'a>(
-        funcs: &IndexMap<String, Item>,
-        stream: &mut TokenStream<'a>,
-        diagnostics: &mut Diagnostics<'a>,
-    ) -> Self {
-        let r = match stream.peek().as_ref() {
-            Token::Ident(i) => match i {
-                i if is_func(funcs, i) => {
-                    let i = i.to_string();
-                    let anchor = stream.peek().span.clone();
-                    stream.advance();
-                    let mut exprs = Vec::new();
-                    while *stream.peek().as_ref() != Token::Semi {
-                        exprs.push(parse_expr(stream, 0., diagnostics));
-                        let next = stream.peek();
-                        if *next.as_ref() == Token::Comma {
-                            stream.advance();
-                        } else if *next.as_ref() != Token::Semi {
-                            diagnostics.errs.push(
-                                AstErr::UnclosedBlock {
-                                    at: next.clone(),
-                                    expected: vec![Token::Semi, Token::Comma],
-                                }
-                                .at(anchor.clone()),
-                            );
-                            skip_until!(stream, Token::Comma | Token::Semi);
-                            if *stream.peek().as_ref() == Token::Comma {
-                                stream.advance();
-                            }
-                        }
-                    }
-                    Self::Call(i, exprs)
-                }
-                _i => {
-                    let name = _i.to_string();
-                    if let Ok(l) = LValue::from_tokens(stream) {
-                        stream.advance();
-                        Self::Decl(l, parse_expr(stream, 0., diagnostics))
-                    } else {
-                        diagnostics.errs.push(
-                            AstErr::UndefinedFunctionCall { name }.at(stream.peek().span.clone()),
-                        );
-                        skip_until!(stream, Token::Semi);
-                        Self::Malformed
-                    }
-                }
-            },
-            Token::Star => {
-                if let Ok(l) = LValue::from_tokens(stream) {
-                    stream.advance();
-                    Self::Decl(l, parse_expr(stream, 0., diagnostics))
-                } else {
-                    Self::Expr(parse_expr(stream, 0., diagnostics))
-                }
-            }
-            Token::Keyword(kw) if matches!(kw, &"if") => {
-                stream.advance();
-                let cond = parse_expr(stream, 0., diagnostics);
-
-                expect_token!(stream, diagnostics, Token::Semi);
-
-                let then = Self::parse(funcs, stream, diagnostics);
-                return Self::Cond(cond, Box::new(then));
-            }
-            Token::EOF => {
-                diagnostics
-                    .errs
-                    .push(AstErr::UnexecpectedEOF.at(stream.peek().span.clone()));
-                return Self::Malformed;
-            }
-            _ => Self::Expr(parse_expr(stream, 0., diagnostics)),
-        };
-        let tok = stream.peek();
-        if *tok.as_ref() != Token::Semi {
-            diagnostics.errs.push(
-                AstErr::UnclosedBlock {
-                    at: tok.clone(),
-                    expected: vec![Token::Semi],
-                }
-                .at(stream.last_span.clone()),
-            );
-            skip_until!(stream, Token::Semi);
-        }
-        stream.advance();
-        r
-    }
-}
-
-impl Val {
-    fn parse<'a>(stream: &mut TokenStream<'a>, diagnostics: &mut Diagnostics<'a>) -> Self {
-        let zelf = match stream.peek().as_ref() {
-            Token::Ident(t) => Self::Var(t.to_string()),
-            Token::Number(num) => Self::V(*num),
-            Token::Lit(t) => Self::Lit(t.to_string()),
-            _tok => {
-                diagnostics.errs.push(
-                    AstErr::UnexpectedToken {
-                        expected: vec![Token::Ident(""), Token::Lit("")],
-                        found: stream.peek().clone(),
-                    }
-                    .at(stream.peek().span.clone()),
-                );
-                return Self::Malformed;
-            }
-        };
-        stream.advance();
-        zelf
     }
 }
 
