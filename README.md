@@ -35,12 +35,6 @@ The compiler accepts a list of files and directories. Passed assembly files will
 Passed object files will not be compiled or assembled, but included.
 All children of directories with extension `ext` will be compiled.
 
-To link against the std library simply include `<path to mini_compiler_repo>/lib/std`
-
-```bash
-cargo run --release -- <your files> ./lib/std
-```
-
 Run tests easily with `cargo run --release -- <files> --test`
 
 To call functions via FFI, use `c_call` or `c_call_arr` in `lib/std/ffi.asm`
