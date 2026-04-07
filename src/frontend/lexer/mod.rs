@@ -45,7 +45,8 @@ pub struct Span {
 
 impl Span {
     pub fn merge(mut self, other: Span) -> Self {
-        self.end = other.end;
+        self.end = other.end.max(self.end);
+        self.start = other.start.midpoint(self.start);
         self
     }
 }
@@ -244,9 +245,9 @@ impl<'a> TokenStream<'a> {
             .unwrap_or_else(|| self.inner.last().unwrap())
     }
 
-    pub fn peekn<'b>(&'b self, n: usize) -> &'b Spanned<Token<'a>> {
+    pub fn peekn<'b>(&'b self, n: i64) -> &'b Spanned<Token<'a>> {
         self.inner
-            .get((self.cursor + n).min(self.inner.len()))
+            .get(((self.cursor as i64 + n) as usize).min(self.inner.len()))
             .unwrap_or_else(|| self.inner.last().unwrap())
     }
 

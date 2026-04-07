@@ -6,7 +6,7 @@ use crate::frontend::lexer::{Span, Token};
 
 #[macro_export]
 macro_rules! unexpected {
-    ($diagnostics:expr,$expected:expr, $found:expr, $block:expr) => {
+    ($diagnostics:expr, $expected:expr, $found:expr, $block:expr) => {
         $diagnostics.errs.push(
             AstErr::UnexpectedToken {
                 expected: $expected.into(),

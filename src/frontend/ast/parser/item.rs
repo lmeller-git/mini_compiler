@@ -178,15 +178,12 @@ impl Function {
     ) -> Option<Self> {
         let func = Self::parse_inner(stream, link_attr, cfg_env, diagnostics);
         if func.is_none() {
-            skip_until_or_over!(
+            skip_until!(
                 stream,
                 Token::Keyword("begin_def")
-                    | Token::Keyword("end_def")
                     | Token::Keyword("extern_def")
                     | Token::Keyword("link_attr")
                     | Token::Keyword("cfg")
-                    | Token::Semi,
-                Token::Keyword("end_def") | Token::Semi
             );
         }
         func
@@ -313,6 +310,24 @@ impl Function {
 
                 let mut line_diagnostics = Diagnostics::new();
                 let line = Line::parse(stream, &mut line_diagnostics);
+
+                if line == Line::Malformed
+                    && matches!(
+                        *stream.peek().as_ref(),
+                        Token::Keyword("begin_def")
+                            | Token::Keyword("public")
+                            | Token::Keyword("extern_def")
+                            | Token::Keyword("link_attr")
+                    )
+                {
+                    unclosed_block!(
+                        diagnostics,
+                        [Token::Keyword("end_def")],
+                        stream.peekn(-1).clone(),
+                        anchor
+                    );
+                    return None;
+                }
 
                 diagnostics.warns.append(&mut line_diagnostics.warns);
                 if cfg {
