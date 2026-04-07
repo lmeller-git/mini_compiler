@@ -252,6 +252,7 @@ impl AsmWriter {
                 self.write_in_fn(format_args!("mov rcx, [{}]", inner));
                 "rcx".into()
             }
+            LValue::Malformed => panic!(),
         }
     }
 

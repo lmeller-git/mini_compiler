@@ -7,7 +7,7 @@ end_def
 
 public begin_def main;
 	hello_world = "hello world\n"; # This is a string
-
+# hh = 834rhh^^&(*&**@@&)(****I)efeqw;;;3284938+++++;
 	print_str hello_world; # This prints a string
 	hello hello_world, "from func hello\n";
 

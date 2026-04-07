@@ -143,12 +143,10 @@ fn main() {
                 let (ast, diagnostics) = get_ast(&s, &cfg_env);
                 print_if!(2, "AST for {}: {}", f_name, ast);
 
+                diagnostics.report(file.to_str().unwrap(), &s);
+
                 if !diagnostics.errs.is_empty() {
                     total_errs += diagnostics.errs.len();
-
-                    for e in diagnostics.errs {
-                        e.report(file.to_str().unwrap(), &s);
-                    }
                     continue;
                 }
 

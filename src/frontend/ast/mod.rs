@@ -6,13 +6,6 @@ pub mod cfg;
 pub mod error;
 pub mod parser;
 
-pub(crate) fn is_func(funcs: &IndexMap<String, Item>, ident: &str) -> bool {
-    funcs
-        .get(ident)
-        .is_some_and(|item| matches!(item, Item::Function(_)))
-        || is_builtin_func(ident)
-}
-
 pub(crate) fn is_builtin_func(ident: &str) -> bool {
     matches!(
         ident,
@@ -118,6 +111,7 @@ pub enum Expr {
 pub enum LValue {
     Variable(String),
     Deref(Box<LValue>),
+    Malformed,
 }
 
 impl Display for LValue {
@@ -125,6 +119,7 @@ impl Display for LValue {
         match self {
             Self::Variable(v) => write!(f, "{v}"),
             Self::Deref(val) => write!(f, "*{}", *val),
+            Self::Malformed => write!(f, "malformed"),
         }
     }
 }

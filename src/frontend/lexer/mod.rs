@@ -1,5 +1,7 @@
 use std::{fmt::Display, ops::Deref};
 
+use crate::frontend::ast::error::Spanned;
+
 static KEYWORDS: &[&str] = &[
     "if",
     "begin_def",
@@ -10,34 +12,28 @@ static KEYWORDS: &[&str] = &[
     "cfg",
 ];
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Spanned<'a> {
-    pub token: Token<'a>,
-    pub span: Span,
-}
-
-impl<'a> Spanned<'a> {
+impl<'a> Spanned<Token<'a>> {
     fn new(token: Token<'a>, span: Span) -> Self {
-        Self { token, span }
+        Self { inner: token, span }
     }
 }
 
-impl<'a> Deref for Spanned<'a> {
+impl<'a> Deref for Spanned<Token<'a>> {
     type Target = Token<'a>;
     fn deref(&self) -> &Self::Target {
         self.as_ref()
     }
 }
 
-impl<'a> AsRef<Token<'a>> for Spanned<'a> {
+impl<'a> AsRef<Token<'a>> for Spanned<Token<'a>> {
     fn as_ref(&self) -> &Token<'a> {
-        &self.token
+        &self.inner
     }
 }
 
-impl<'a> Display for Spanned<'a> {
+impl<'a> Display for Spanned<Token<'a>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}", self.token)
+        writeln!(f, "{}", self.as_ref())
     }
 }
 
@@ -213,7 +209,7 @@ impl Display for Token<'_> {
 
 #[derive(Debug)]
 pub struct TokenStream<'a> {
-    inner: Vec<Spanned<'a>>,
+    inner: Vec<Spanned<Token<'a>>>,
     cursor: usize,
     pub last_span: Span,
 }
@@ -227,7 +223,7 @@ impl<'a> TokenStream<'a> {
         }
     }
 
-    pub fn next<'b>(&'b mut self) -> &'b Spanned<'a> {
+    pub fn next<'b>(&'b mut self) -> &'b Spanned<Token<'a>> {
         self.last_span = self.peek().span.clone();
         let r = self
             .inner
@@ -242,19 +238,19 @@ impl<'a> TokenStream<'a> {
         self.cursor = self.inner.len().min(self.cursor + 1);
     }
 
-    pub fn peek<'b>(&'b self) -> &'b Spanned<'a> {
+    pub fn peek<'b>(&'b self) -> &'b Spanned<Token<'a>> {
         self.inner
             .get(self.cursor)
             .unwrap_or_else(|| self.inner.last().unwrap())
     }
 
-    pub fn peekn<'b>(&'b self, n: usize) -> &'b Spanned<'a> {
+    pub fn peekn<'b>(&'b self, n: usize) -> &'b Spanned<Token<'a>> {
         self.inner
             .get((self.cursor + n).min(self.inner.len()))
             .unwrap_or_else(|| self.inner.last().unwrap())
     }
 
-    fn push(&mut self, token: Spanned<'a>) {
+    fn push(&mut self, token: Spanned<Token<'a>>) {
         self.inner.push(token);
     }
 

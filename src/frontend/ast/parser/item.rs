@@ -1,7 +1,6 @@
 use indexmap::IndexMap;
 
 use crate::{
-    expect_token,
     frontend::{
         ast::{
             Ast, Function, Item, Line, LinkAttr, LinkMeta,
@@ -11,99 +10,75 @@ use crate::{
         },
         lexer::{Token, TokenStream},
     },
-    parse_list, skip_until, skip_until_kw,
+    kw, skip_until, skip_until_or_over, unclosed_block, unexpected,
 };
 
 impl Ast {
     pub fn from_stream<'a>(s: &mut TokenStream<'a>, cfg_env: &CfgEnv) -> (Self, Diagnostics<'a>) {
         let mut diagnostics = Diagnostics::new();
         let mut functions = IndexMap::new();
+        let mut skip_next = false;
         loop {
             let anchor = s.peek().span.clone();
             match s.peek().as_ref() {
                 Token::EOF => break,
                 Token::Keyword("cfg") => {
                     s.advance();
-                    let cfg = cfg_env.eval_cfg_expr(&parse_expr(s, 0., &mut diagnostics));
-
-                    let _semi = s.peek();
-                    if *_semi.as_ref() != Token::Semi {
-                        diagnostics.errs.push(
-                            AstErr::UnclosedBlock {
-                                at: s.peek().clone(),
-                                expected: vec![Token::Semi],
-                            }
-                            .at(anchor.clone().merge(s.last_span.clone())),
+                    skip_next = !cfg_env.eval_cfg_expr(&parse_expr(s, 0., &mut diagnostics));
+                    if *s.peek().as_ref() != Token::Semi {
+                        unexpected!(
+                            diagnostics,
+                            [Token::Semi],
+                            s.peek().clone(),
+                            anchor.clone().merge(s.last_span.clone())
                         );
-                        skip_until!(s, Token::Semi);
                     }
-                    s.advance();
-
-                    if !cfg {
-                        skip_until!(
-                            s,
-                            Token::Keyword("begin_def")
-                                | Token::Keyword("extern_def")
-                                | Token::Keyword("public")
-                        );
-                        match s.peek().as_ref() {
-                            Token::Keyword("begin_def") | Token::Keyword("public") => {
-                                skip_until!(s, Token::Keyword("end_def"))
-                            }
-                            Token::Keyword("extern_def") => skip_until!(s, Token::Semi),
-                            Token::EOF => {
-                                diagnostics.errs.push(
-                                    AstErr::UnexecpectedEOF
-                                        .at(anchor.clone().merge(s.last_span.clone())),
-                                );
-                            }
-                            _ => unreachable!(),
-                        }
-                        s.advance();
-                    }
+                    skip_until_or_over!(s, kw!(Token::Semi), Token::Semi);
                 }
                 Token::Keyword(kw)
                     if matches!(*kw, "link_attr" | "begin_def" | "public" | "extern_def") =>
                 {
-                    let link_attr = LinkAttr::parse(s, &mut diagnostics);
+                    let mut item_diagnostic = Diagnostics::new();
+                    let link_attr = LinkAttr::parse(s, &mut item_diagnostic);
 
-                    if let Some(f) =
-                        Function::parse(&functions, s, link_attr, cfg_env, &mut diagnostics)
+                    if let Some(f) = Function::parse(s, link_attr, cfg_env, &mut item_diagnostic)
+                        && !skip_next
                     {
                         functions.insert(f.name.clone(), Item::Function(f));
-                    } else {
-                        functions.insert(
-                            format!("<__malformed_{}>", diagnostics.errs.len()),
-                            Item::Malformed,
-                        );
-                        skip_until!(
-                            s,
-                            Token::Keyword("end_def")
-                                | Token::Keyword("cfg")
-                                | Token::Keyword("link_attr")
-                                | Token::Keyword("begin_def")
-                                | Token::Keyword("extern_def")
-                                | Token::Keyword("public")
-                        );
-                        expect_token!(s, &mut diagnostics, anchor, [Token::Keyword("end_def")]);
                     }
+
+                    diagnostics.warns.append(&mut item_diagnostic.warns);
+
+                    if skip_next {
+                        diagnostics.warns.extend(
+                            item_diagnostic
+                                .errs
+                                .into_iter()
+                                .map(|e| e.inner.into_warn("cfg".into()).at(e.span)),
+                        );
+                    } else {
+                        diagnostics.errs.append(&mut item_diagnostic.errs);
+                    }
+                    skip_next = false;
                 }
                 _invalid => {
-                    diagnostics.errs.push(
-                        AstErr::UnexpectedToken {
-                            expected: vec![
-                                Token::Keyword("cfg"),
-                                Token::Keyword("begin_def"),
-                                Token::Keyword("public"),
-                                Token::Keyword("link_attr"),
-                            ],
-                            found: s.peek().clone(),
-                        }
-                        .at(anchor),
+                    unexpected!(
+                        diagnostics,
+                        [
+                            Token::Keyword("cfg"),
+                            Token::Keyword("begin_def"),
+                            Token::Keyword("public"),
+                            Token::Keyword("link_attr")
+                        ],
+                        s.peek().clone(),
+                        anchor
                     );
+
+                    skip_next = false;
                     skip_until!(
                         s,
                         Token::Keyword("begin_def")
+                            | Token::Keyword("extern_def")
                             | Token::Keyword("public")
                             | Token::Keyword("cfg")
                             | Token::Keyword("link_attr")
@@ -142,18 +117,14 @@ impl LinkAttr {
                         Token::Ident("public") => zelf = zelf.into_pub(),
                         Token::Ident("private") => zelf.is_public = false,
                         _tok => {
-                            diagnostics.errs.push(
-                                AstErr::UnexpectedToken {
-                                    expected: vec![
-                                        Token::Keyword("public"),
-                                        Token::Keyword("private"),
-                                    ],
-                                    found: stream.peekn(1).clone(),
-                                }
-                                .at(anchor.merge(stream.peek().span.clone())),
+                            unexpected!(
+                                diagnostics,
+                                [Token::Ident("public"), Token::Ident("private")],
+                                stream.peekn(1).clone(),
+                                anchor.merge(stream.peek().span.clone())
                             );
-                            skip_until!(stream, Token::Semi);
-                            stream.advance();
+
+                            skip_until_or_over!(stream, kw!(Token::Semi), Token::Semi);
                             continue;
                         }
                     }
@@ -165,42 +136,33 @@ impl LinkAttr {
                     stream.advance();
                 }
                 (_tok, _, _) => {
-                    diagnostics.errs.push(
-                        AstErr::UnexpectedToken {
-                            expected: vec![
-                                Token::Keyword("section"),
-                                Token::Keyword("raw"),
-                                Token::Keyword("vis"),
-                            ],
-                            found: stream.peek().clone(),
-                        }
-                        .at(anchor),
+                    unexpected!(
+                        diagnostics,
+                        [
+                            Token::Keyword("section"),
+                            Token::Keyword("raw"),
+                            Token::Keyword("vis"),
+                            Token::Keyword("section")
+                        ],
+                        stream.peek().clone(),
+                        anchor
                     );
-                    skip_until!(stream, Token::Semi);
-                    stream.advance();
+
+                    skip_until_or_over!(stream, kw!(Token::Semi), Token::Semi);
                     continue;
                 }
             }
 
-            let _tok = stream.peek();
-            if *_tok.as_ref() != Token::Semi {
-                diagnostics.errs.push(
-                    AstErr::UnclosedBlock {
-                        at: _tok.clone(),
-                        expected: vec![Token::Semi],
-                    }
-                    .at(anchor.merge(stream.last_span.clone())),
+            if *stream.peek().as_ref() != Token::Semi {
+                unclosed_block!(
+                    diagnostics,
+                    [Token::Semi],
+                    stream.peek().clone(),
+                    anchor.merge(stream.last_span.clone())
                 );
-                skip_until!(
-                    stream,
-                    Token::Keyword("begin_def")
-                        | Token::Keyword("extern_def")
-                        | Token::Semi
-                        | Token::Keyword("link_attr")
-                );
-            } else {
-                stream.advance();
             }
+
+            skip_until_or_over!(stream, kw!(Token::Semi), Token::Semi);
         }
 
         zelf
@@ -209,7 +171,28 @@ impl LinkAttr {
 
 impl Function {
     fn parse<'a>(
-        funcs: &IndexMap<String, Item>,
+        stream: &mut TokenStream<'a>,
+        link_attr: LinkAttr,
+        cfg_env: &CfgEnv,
+        diagnostics: &mut Diagnostics<'a>,
+    ) -> Option<Self> {
+        let func = Self::parse_inner(stream, link_attr, cfg_env, diagnostics);
+        if func.is_none() {
+            skip_until_or_over!(
+                stream,
+                Token::Keyword("begin_def")
+                    | Token::Keyword("end_def")
+                    | Token::Keyword("extern_def")
+                    | Token::Keyword("link_attr")
+                    | Token::Keyword("cfg")
+                    | Token::Semi,
+                Token::Keyword("end_def") | Token::Semi
+            );
+        }
+        func
+    }
+
+    fn parse_inner<'a>(
         stream: &mut TokenStream<'a>,
         mut link_attr: LinkAttr,
         cfg_env: &CfgEnv,
@@ -224,52 +207,73 @@ impl Function {
             kw = stream.peek();
             link_attr = link_attr.into_pub();
         }
-        let has_body = match kw.as_ref() {
+
+        let is_local = match kw.as_ref() {
             Token::Keyword("extern_def") => false,
             Token::Keyword("begin_def") => true,
             _tok => {
-                diagnostics.errs.push(
-                    AstErr::UnexpectedToken {
-                        expected: vec![Token::Keyword("extern_def"), Token::Keyword("begin_def")],
-                        found: kw.clone(),
-                    }
-                    .at(stream.last_span.clone()),
+                unexpected!(
+                    diagnostics,
+                    [Token::Keyword("begin_def"), Token::Keyword("extern_def")],
+                    kw.clone(),
+                    stream.last_span.clone()
                 );
                 return None;
             }
         };
 
-        if !has_body {
+        if !is_local {
             link_attr = link_attr.into_external();
         }
 
         stream.advance();
 
         let ident = stream.peek();
-        let Token::Ident(_ident) = ident.as_ref() else {
-            diagnostics.errs.push(
-                AstErr::UnexpectedToken {
-                    expected: vec![Token::Ident("<function name>")],
-                    found: ident.clone(),
-                }
-                .at(anchor.merge(stream.last_span.clone())),
+        let Token::Ident(ident) = ident.as_ref() else {
+            unexpected!(
+                diagnostics,
+                [Token::Ident("<ident>")],
+                ident.clone(),
+                anchor.merge(stream.last_span.clone())
             );
             return None;
         };
-        let name = _ident.to_string();
+        let name = ident.to_string();
         stream.advance();
 
-        let args = parse_list!(stream, anchor, Token::Semi, Token::Comma, Token::Ident(ident) => ident.to_string());
+        let mut args = Vec::new();
 
-        let args = match args {
-            Ok(a) => a,
-            Err(e) => {
-                diagnostics.errs.push(e);
-                Vec::new()
+        while *stream.peek().as_ref() != Token::Semi {
+            let Token::Ident(ident) = stream.peek().as_ref() else {
+                unexpected!(
+                    diagnostics,
+                    [Token::Ident("<ident>")],
+                    stream.peek().clone(),
+                    anchor.merge(stream.last_span.clone())
+                );
+                return None;
+            };
+
+            args.push(ident.to_string());
+            stream.advance();
+
+            let next = stream.peek();
+            if *next.as_ref() == Token::Comma {
+                stream.advance();
+            } else if *next.as_ref() != Token::Semi {
+                unclosed_block!(
+                    diagnostics,
+                    [Token::Semi, Token::Comma],
+                    next.clone(),
+                    anchor.clone().merge(stream.last_span.clone())
+                );
+                return None;
             }
-        };
+        }
 
-        let body = if has_body {
+        stream.advance();
+
+        let body = if is_local {
             let mut body = Vec::new();
 
             while *stream.peek().as_ref() != Token::Keyword("end_def") {
@@ -281,47 +285,55 @@ impl Function {
                         | Token::Keyword("link_attr")
                         | Token::Keyword("public")
                 ) {
-                    break;
+                    unclosed_block!(
+                        diagnostics,
+                        [Token::Keyword("end_def")],
+                        stream.peek().clone(),
+                        anchor.merge(stream.last_span.clone())
+                    );
+                    return None;
                 }
-                if let Token::Keyword("cfg") = stream.peek().as_ref() {
+
+                let cfg = if let Token::Keyword("cfg") = stream.peek().as_ref() {
                     stream.advance();
                     let cfg = cfg_env.eval_cfg_expr(&parse_expr(stream, 0., diagnostics));
-                    stream.advance();
-                    if !cfg {
-                        loop {
-                            let tok_is_if = *stream.peek().as_ref() == Token::Keyword("if");
-                            skip_until!(stream, Token::Semi);
-                            stream.advance();
-                            if !tok_is_if {
-                                break;
-                            }
-                        }
-                        continue;
+                    if *stream.peek().as_ref() != Token::Semi {
+                        unexpected!(
+                            diagnostics,
+                            [Token::Semi],
+                            stream.peek().clone(),
+                            anchor.clone().merge(stream.last_span.clone())
+                        );
                     }
+                    skip_until_or_over!(stream, kw!(Token::Semi), Token::Semi);
+                    cfg
+                } else {
+                    true
+                };
+
+                let mut line_diagnostics = Diagnostics::new();
+                let line = Line::parse(stream, &mut line_diagnostics);
+
+                diagnostics.warns.append(&mut line_diagnostics.warns);
+                if cfg {
+                    body.push(line);
+                    diagnostics.errs.append(&mut line_diagnostics.errs);
+                } else {
+                    diagnostics.warns.extend(
+                        line_diagnostics
+                            .errs
+                            .into_iter()
+                            .map(|err| err.inner.into_warn("cfg".into()).at(err.span)),
+                    );
                 }
-                let line = Line::parse(funcs, stream, diagnostics);
-                if line == Line::Malformed {
-                    skip_until_kw!(stream, Token::Semi);
-                }
-                body.push(line);
             }
             Some(body)
         } else {
             None
         };
 
-        if !has_body || matches!(stream.peek().as_ref(), Token::Keyword("end_def")) {
-            if has_body {
-                stream.advance();
-            }
-        } else {
-            diagnostics.errs.push(
-                AstErr::UnclosedBlock {
-                    at: stream.peek().clone(),
-                    expected: vec![Token::Keyword("end_def")],
-                }
-                .at(anchor.merge(stream.last_span.clone())),
-            );
+        if is_local {
+            stream.advance();
         }
 
         Some(Self {

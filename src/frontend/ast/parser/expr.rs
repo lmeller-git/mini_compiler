@@ -2,11 +2,11 @@ use crate::{
     frontend::{
         ast::{
             Expr, Operation, Val,
-            error::{AstErr, Diagnostics},
+            error::{AstErr, Diagnostics, Spanned},
         },
-        lexer::{Spanned, Token, TokenStream},
+        lexer::{Token, TokenStream},
     },
-    skip_until,
+    unclosed_block, unexpected,
 };
 
 pub fn parse_expr<'a>(
@@ -20,21 +20,21 @@ pub fn parse_expr<'a>(
             Expr::Val(Val::parse(stream, diagnostics))
         }
         Token::Semi | Token::Comma | Token::EOF | Token::CloseParen => {
-            diagnostics.errs.push(
-                AstErr::UnexpectedToken {
-                    expected: vec![
-                        Token::Star,
-                        Token::Ampercent,
-                        Token::Not,
-                        Token::OpenParen,
-                        Token::Ident(""),
-                        Token::Lit(""),
-                        Token::Number(0),
-                    ],
-                    found: stream.peek().clone(),
-                }
-                .at(stream.last_span.clone()),
+            unexpected!(
+                diagnostics,
+                [
+                    Token::Star,
+                    Token::Ampercent,
+                    Token::Not,
+                    Token::OpenParen,
+                    Token::Ident("<ident>"),
+                    Token::Lit("<strlit>"),
+                    Token::Number(0),
+                ],
+                stream.peek().clone(),
+                stream.last_span.clone()
             );
+
             return Expr::Malformed;
         }
         Token::OpenParen => {
@@ -46,13 +46,13 @@ pub fn parse_expr<'a>(
             if let Token::CloseParen = stream.peek().as_ref() {
                 stream.advance();
             } else {
-                diagnostics.errs.push(
-                    AstErr::UnclosedBlock {
-                        at: stream.peek().clone(),
-                        expected: vec![Token::CloseParen],
-                    }
-                    .at(anchor.merge(stream.last_span.clone())),
+                unclosed_block!(
+                    diagnostics,
+                    [Token::CloseParen],
+                    stream.peek().clone(),
+                    anchor.merge(stream.last_span.clone())
                 );
+                return Expr::Malformed;
             }
             lhs
         }
@@ -65,25 +65,25 @@ pub fn parse_expr<'a>(
                 }
                 Expr::Op(Box::new(Expr::Val(Val::V(0))), op, Box::new(rhs))
             } else {
-                diagnostics.errs.push(
-                    AstErr::UnexpectedToken {
-                        expected: vec![
-                            Token::Star,
-                            Token::Ampercent,
-                            Token::Not,
-                            Token::Ident(""),
-                            Token::Lit(""),
-                            Token::Number(0),
-                        ],
-                        found: stream.peek().clone(),
-                    }
-                    .at(anchor.merge(stream.last_span.clone())),
+                unexpected!(
+                    diagnostics,
+                    [
+                        Token::Star,
+                        Token::Ampercent,
+                        Token::Not,
+                        Token::Ident(""),
+                        Token::Lit(""),
+                        Token::Number(0),
+                    ],
+                    stream.peek().clone(),
+                    anchor.merge(stream.last_span.clone())
                 );
-                skip_until!(stream, Token::Semi);
-                Expr::Malformed
+
+                return Expr::Malformed;
             }
         }
     };
+
     while let Some(op) = Operation::try_from_token(stream.peek()) {
         let (l, r) = op.infix_power();
         if r < min_bp {
@@ -115,7 +115,7 @@ impl Operation {
         }
     }
 
-    fn try_from_token_as_single<'a>(token: &Spanned<'a>) -> Option<Self> {
+    fn try_from_token_as_single<'a>(token: &Spanned<Token<'a>>) -> Option<Self> {
         Some(match token.as_ref() {
             Token::Star => Self::Load,
             Token::Ampercent => Self::AsRef,
@@ -124,7 +124,7 @@ impl Operation {
         })
     }
 
-    fn try_from_token<'a>(token: &Spanned<'a>) -> Option<Self> {
+    fn try_from_token<'a>(token: &Spanned<Token<'a>>) -> Option<Self> {
         Some(match token.as_ref() {
             Token::Star => Self::Mul,
             Token::Add => Self::Add,
@@ -136,7 +136,6 @@ impl Operation {
             Token::Hat => Self::BitXOR,
             Token::Shr => Self::Shr,
             Token::Shl => Self::Shl,
-            Token::Not => Self::Not,
             Token::Gt => Self::Gt,
             Token::Lt => Self::Lt,
             Token::EqEq => Self::EqEq,
@@ -153,12 +152,11 @@ impl Val {
             Token::Number(num) => Self::V(*num),
             Token::Lit(t) => Self::Lit(t.to_string()),
             _tok => {
-                diagnostics.errs.push(
-                    AstErr::UnexpectedToken {
-                        expected: vec![Token::Ident("<ident>"), Token::Lit("<strlit>")],
-                        found: stream.peek().clone(),
-                    }
-                    .at(stream.last_span.clone()),
+                unexpected!(
+                    diagnostics,
+                    [Token::Ident("<ident>"), Token::Lit("<strlit>")],
+                    stream.peek().clone(),
+                    stream.last_span.clone()
                 );
                 return Self::Malformed;
             }

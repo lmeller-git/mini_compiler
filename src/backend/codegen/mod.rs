@@ -271,8 +271,7 @@ impl CodeBuilder {
                     });
                     Operand::Temp(in_scope_temp)
                 }
-                // TODO this should probably panic instead?
-                Val::Malformed => Operand::Immediate(0),
+                Val::Malformed => panic!(),
             },
             Expr::Op(lhs, op, rhs) => {
                 let lhs = self.lower_unit(lhs.as_ref());
@@ -286,8 +285,7 @@ impl CodeBuilder {
                 });
                 Operand::Temp(res)
             }
-            // TODO this should probably panic instead?
-            Expr::Malformed => Operand::Immediate(0),
+            Expr::Malformed => panic!(),
         }
     }
 
@@ -295,6 +293,7 @@ impl CodeBuilder {
         match lvalue {
             LValue::Variable(var) => self.rename_ident(var),
             LValue::Deref(lvalue) => self.rename_lvalue(lvalue.as_mut()),
+            LValue::Malformed => panic!(),
         }
     }
 
