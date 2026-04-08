@@ -1,4 +1,4 @@
-extern_def parse_argv_to_int arg, to;
+extern_def parse_argv_to_int arg;
 extern_def sqrt;
 
 public begin_def main argc, argv;
@@ -8,8 +8,7 @@ public begin_def main argc, argv;
 
 	if argc < 2; goto exit_;
 
-	number = 0;
-	parse_argv_to_int *(argv + 8), &number;
+	parse_argv_to_int *(argv + 8) : number;
 
 	print_str "the number to evaluate: ";
 	print number;

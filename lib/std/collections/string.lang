@@ -16,25 +16,26 @@ extern_def call_memcpy;
 # A String is just a Vec, where each element holds 8 ascii chars
 # The first slot holds the len
 
-# Usage: string &to, cap;
-public begin_def string to, cap;
+# Usage: string cap : to;
+public begin_def string cap;
 	if cap % 8 == 0; goto alloc;
 	cap = cap + 8;
 	label alloc;
-	vec to, cap / 8 + 2;
-	vec_push to, 0;
-	vec_push to, 0;
+	vec cap / 8 + 2 : to;
+	vec_push &to, 0;
+	vec_push &to, 0;
+	return to;
 end_def
 
-# Usage: str_len string, &to;
-public begin_def str_len str, to;
-	*to = *str;
+# Usage: str_len string : to;
+public begin_def str_len str;
+	return *str;
 end_def
 
-# Usage str_cap string, &to;
-public begin_def str_cap str, to;
-	vec_cap str, to;
-	*to = (*to - 1) * 8;
+# Usage str_cap string : to;
+public begin_def str_cap str;
+	vec_cap str : to;
+	return (to - 1) * 8;
 end_def
 
 # Internal
@@ -93,10 +94,10 @@ public begin_def str_insert str, value, at;
 	label exit;
 end_def
 
-# Usage: str_get str, at, &to;
-begin_def str_get str, at, to;
+# Usage: str_get str, at : to;
+begin_def str_get str, at;
 	if !(*str > at); __bound_violation *str, at, "in get";
-	*to = *(str + at + 8) % 256;
+	return *(str + at + 8) % 256;
 end_def
 
 # Usage: str_set str, at, value;
@@ -106,35 +107,32 @@ begin_def str_set str, at, value;
 	__insert_byte str + at + 8, value;
 end_def
 
-# Usage: str_pop &str, &to;
-public begin_def str_pop str, to;
-	if **str; goto non_empty;
-	*to = 0;
-	goto exit;
+# Usage: str_pop &str : to;
+public begin_def str_pop str;
+	if !**str; return 0;
 
-	label non_empty;
 	**str = **str - 1;
 	_popped_from_bytes = *str + **str + 8;
-	*to = *_popped_from_bytes;
+	to = *_popped_from_bytes;
 	__insert_byte _popped_from_bytes, 0;
-
-	label exit;
+	return to;
 end_def
 
-# Usage: str_remove, &str, from, &to;
-public begin_def str_remove str, from, to;
+# Usage: str_remove, &str, from : to;
+public begin_def str_remove str, from;
 	if from < **str; goto within;
 	if from > **str; __bound_violation **str, from, "in remove";
 	# this remove is a pop (from == len)
-	str_pop str, to;
+	str_pop str : to;
 	goto exit;
 
 	label within;
-	*to = *(*str + from + 8) % 256;
+	to = *(*str + from + 8) % 256;
 	call_memmove *str + from + 8, *str + from + 9, (**str - from) - 1;
 	**str = **str - 1;
 
 	label exit;
+	return to;
 end_def
 
 # Usage: str_push_strlit &str, strlit;
@@ -149,9 +147,9 @@ public begin_def str_push_strlit str, strlit;
 	label exit;
 end_def
 
-# Usage str_as_ptr str, &to;
-public begin_def str_as_ptr str, to;
-	*to = str + 8;
+# Usage str_as_ptr str : to;
+public begin_def str_as_ptr str;
+	return str + 8;
 end_def
 
 # Usage: str_dop str;
@@ -168,14 +166,12 @@ extern_def test_assert_eq;
 cfg test;
 link_attr section tests;
 begin_def test_str_len;
-    s = 0;
-    string &s, 16;
-    len = 0;
-    str_len s, &len;
+    string 16 : s;
+    str_len s : len;
     test_assert_eq len, 0;
 
     str_push &s, 65;
-    str_len s, &len;
+    str_len s : len;
     test_assert_eq len, 1;
 
     str_drop s;
@@ -184,10 +180,8 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_str_cap;
-    s = 0;
-    string &s, 16;
-    cap = 0;
-    str_cap s, &cap;
+    string 16 : s;
+    str_cap s : cap;
 
     # 16 + 8 = 24. 24/8+2 = 5 vec cap. (5-1)*8 = 32 string cap.
     test_assert_eq cap, 32;
@@ -197,13 +191,11 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_str_push;
-    s = 0;
-    string &s, 16;
+    string 16 : s;
     str_push &s, 65;
     str_push &s, 66;
 
-    len = 0;
-    str_len s, &len;
+    str_len s : len;
     test_assert_eq len, 2;
 
     str_drop s;
@@ -212,16 +204,13 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_str_pop;
-    s = 0;
-    string &s, 16;
+    string 16 : s;
     str_push &s, 65;
 
-    val = 0;
-    str_pop &s, &val;
+    str_pop &s : val;
     test_assert_eq val, 65;
 
-    len = 0;
-    str_len s, &len;
+    str_len s : len;
     test_assert_eq len, 0;
 
     str_drop s;
@@ -230,18 +219,15 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_str_insert;
-    s = 0;
-    string &s, 16;
+    string 16 : s;
     str_push &s, 65;
     str_push &s, 67;
     str_insert &s, 66, 1;
 
-    len = 0;
-    str_len s, &len;
+    str_len s : len;
     test_assert_eq len, 3;
 
-    val = 0;
-    str_get s, 1, &val;
+    str_get s, 1 : val;
     test_assert_eq val, 66;
 
     str_drop s;
@@ -250,18 +236,15 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_str_remove;
-    s = 0;
-    string &s, 16;
+    string 16 : s;
     str_push &s, 65;
     str_push &s, 66;
     str_push &s, 67;
 
-    val = 0;
-    str_remove &s, 1, &val;
+    str_remove &s, 1 : val;
     test_assert_eq val, 66;
 
-	len = 0;
-    str_len s, &len;
+    str_len s : len;
     test_assert_eq len, 2;
 
     str_drop s;
@@ -270,13 +253,11 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_str_extend;
-    s = 0;
-    string &s, 16;
+    string 16 : s;
     lit = "Hi";
     str_push_strlit &s, lit;
 
-    len = 0;
-    str_len s, &len;
+    str_len s : len;
     test_assert_eq len, 2;
 
     str_drop s;
@@ -285,13 +266,11 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_str_get;
-    s = 0;
-    string &s, 16;
+    string 16 : s;
     str_push &s, 65;
     str_push &s, 66;
 
-    val = 0;
-    str_get s, 1, &val;
+    str_get s, 1 : val;
     test_assert_eq val, 66;
 
     str_drop s;
@@ -300,13 +279,11 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_str_set;
-    s = 0;
-    string &s, 16;
+    string 16 : s;
     str_push &s, 65;
     str_set s, 0, 99;
 
-    val = 0;
-    str_get s, 0, &val;
+    str_get s, 0 : val;
     test_assert_eq val, 99;
 
     str_drop s;
@@ -315,15 +292,13 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_str_integration;
-    s = 0;
-    string &s, 8;
+    string 8 : s;
     lit = "Test";
     str_push_strlit &s, lit;
 
     str_set s, 0, 116; # lowercase 't'
 
-    val = 0;
-    str_get s, 0, &val;
+    str_get s, 0 : val;
     test_assert_eq val, 116;
 
     str_drop s;
@@ -333,8 +308,7 @@ cfg test;
 link_attr section tests;
 begin_def test_str_drops;
 	# TODO
-    s = 0;
-    string &s, 8;
+    string 8 : s;
     str_drop s;
     test_assert 1;
 end_def

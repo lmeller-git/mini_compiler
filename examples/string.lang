@@ -12,15 +12,10 @@ extern_def print;
 extern_def str_as_ptr;
 
 public begin_def main;
-    my_str = 0;
-    string &my_str, 0;
+    string 0 : my_str;
 
-    length = 0;
-    capacity = 0;
-	ptr = 0;
-
-    str_len my_str, &length;
-    str_cap my_str, &capacity;
+    str_len my_str : length;
+    str_cap my_str : capacity;
     print_str "len: ";
     println length;
     print_str "cap: ";
@@ -33,35 +28,34 @@ public begin_def main;
     str_push &my_str, 67;
     str_push &my_str, 68;
 
-    str_as_ptr my_str, &ptr;
+    str_as_ptr my_str : ptr;
     print_str ptr;
     print_str "\n\n";
 
-    popped_val = 0;
-    str_pop &my_str, &popped_val;
+    str_pop &my_str : popped_val;
 
     print_str "popped (ascii): ";
     println popped_val;
 
-	str_as_ptr my_str, &ptr;
+	str_as_ptr my_str : ptr;
     print_str ptr;
     print_str "\n\n";
 
     # Insert 'X' (88) at index 1 -> Should print "AXBC"
     str_insert &my_str, 88, 1;
 
-    str_as_ptr my_str, &ptr;
+    str_as_ptr my_str : ptr;
     print_str ptr;
     print_str "\n\n";
 
     label push;
     # Push '!' (33)
     str_push &my_str, 33;
-    str_len my_str, &length;
+    str_len my_str : length;
     if length < 100; goto push;
-    str_cap my_str, &capacity;
+    str_cap my_str : capacity;
 
-    str_as_ptr my_str, &ptr;
+    str_as_ptr my_str : ptr;
     print_str ptr;
     print_str "\n\n";
 

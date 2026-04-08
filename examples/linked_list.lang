@@ -9,11 +9,7 @@ extern_def print_ll;
 extern_def println;
 
 public begin_def main;
-    ll = 0;
-    linked_list &ll;
-
-    length = 0;
-    to = 0;
+    linked_list : ll;
 
     print_str "--- INIT ---\n";
     print_ll ll;
@@ -29,14 +25,14 @@ public begin_def main;
     print_str "\n";
 
     # Test length retrieval
-    ll_len ll, &length;
+    ll_len ll : length;
     println length;
     print_str "\n";
 
     # Test insertions
     print_str "--- INSERT (99 at index 2) ---\n";
     ll_insert ll, 2, 99;
-    ll_len ll, &length;
+    ll_len ll : length;
     print_str "len: ";
     println length;
     print_ll ll;
@@ -44,20 +40,20 @@ public begin_def main;
 
     # Test removals
     print_str "--- REMOVE (at index 1) ---\n";
-    ll_remove ll, 1, &to;
+    ll_remove ll, 1 : to;
     print_str "len: ";
-    ll_len ll, &length;
+    ll_len ll : length;
     println length;
     print_ll ll;
     print_str "\n";
 
     # Test popping from boundaries
     print_str "--- POPS ---\n";
-    ll_pop_front ll, &to;
+    ll_pop_front ll : to;
     print_str "popped front: ";
     println to;
 
-    ll_pop_tail ll, &to;
+    ll_pop_tail ll : to;
     print_str "popped tail: ";
     println to;
 
@@ -69,7 +65,7 @@ public begin_def main;
     print_str "--- STRESS TEST (Push to length 20) ---\n";
     label push_loop;
     ll_push_tail ll, 42;
-    ll_len ll, &length;
+    ll_len ll : length;
     if length < 20; goto push_loop;
 
     print_ll ll;

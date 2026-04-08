@@ -274,7 +274,7 @@ impl AsmWriter {
         &mut self,
         name: &str,
         args: &[Operand],
-        _ret: &Option<Operand>,
+        ret: &Option<Operand>,
         vars: &Vars,
         temps: &mut TempVarStack,
     ) {
@@ -307,7 +307,7 @@ impl AsmWriter {
                 self.write_in_fn(format_args!("add rsp, 8"));
                 self.write_in_fn(format_args!("ret"));
             }
-            "addr_of" => self.builtin_addr_of(args, vars, temps),
+            "addr_of" => self.builtin_addr_of(args, ret, vars, temps),
             "goto" => self.write_in_fn(format_args!("jmp {}", args[0])),
             "label" => writeln!(self.fh, "{}:", args[0]).unwrap(),
             "asm" => self.write_in_fn(format_args!("{}", args[0])),
@@ -315,30 +315,20 @@ impl AsmWriter {
         }
     }
 
-    fn builtin_addr_of(&mut self, args: &[Operand], vars: &Vars, temps: &mut TempVarStack) {
-        let addr_getter = match &args[0] {
-            Operand::Variable(ident) => &format!("lea rax, [rel {}]", ident),
-            _ => "xor rax, rax",
-        };
-
-        let rcx_usage = USAGE[Reg::RCX as usize].load(Ordering::Relaxed);
-        if rcx_usage {
-            self.write_in_fn(format_args!("push rcx"));
-            temps.inc_stack(8);
+    fn builtin_addr_of(
+        &mut self,
+        args: &[Operand],
+        ret: &Option<Operand>,
+        _vars: &Vars,
+        temps: &mut TempVarStack,
+    ) {
+        if let Some(Operand::Variable(ident)) = args.first() {
+            self.write_in_fn(format_args!("lea rax, [rel {}]", ident));
         }
 
-        self.write_in_fn(format_args!(
-            "mov rcx, {}",
-            self.get_var_str(&args[1], vars, temps)
-        ));
-
-        self.write_in_fn(format_args!("{}", addr_getter));
-
-        self.write_in_fn(format_args!("mov [rcx], rax"));
-
-        if rcx_usage {
-            self.write_in_fn(format_args!("pop rcx"));
-            temps.dec_stack(8);
+        if let Some(Operand::Temp(dest)) = ret {
+            let temp = self.get_or_init_temp(dest, temps);
+            self.write_in_fn(format_args!("mov {}, rax", temp));
         }
     }
 

@@ -24,13 +24,11 @@ public begin_def _test_state_reset_flag;
 	";
 end_def
 
-# reads test_failed flag into to
+# reads test_failed flag and returns it
 cfg test;
-public begin_def _test_state_read_flag to;
+public begin_def _test_state_read_flag;
 	asm "
 	lea rax, [rel __static_test_failed_ptr]
     mov rax, [rax]
-    mov r8, [___test_state_read_flag_var_to]
-    mov [r8], rax
 	";
 end_def

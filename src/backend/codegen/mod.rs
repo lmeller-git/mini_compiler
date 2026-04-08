@@ -218,11 +218,10 @@ impl CodeBuilder {
     fn lower_builtin(&mut self, name: &str, exprs: &[Expr]) -> Vec<Operand> {
         match name {
             "addr_of" => {
-                // here we expect two args: [Variable(Ident), Operation (the target to store the result to)]
+                // here we expect one args: [Variable(Ident)]
                 // We search the current function for variables of matching names, if one is found we return its addr, else we assume this to be an external symbol
-                debug_assert_eq!(exprs.len(), 2);
+                debug_assert_eq!(exprs.len(), 1);
                 let var = &exprs[0];
-                let to = &exprs[1];
                 let Expr::Val(Val::Var(ident)) = var else {
                     panic!("currently only idents may be passed to addr_of");
                 };
@@ -245,7 +244,7 @@ impl CodeBuilder {
                     ident.to_string()
                 };
 
-                vec![Operand::Variable(ident), self.lower_unit(to)]
+                vec![Operand::Variable(ident)]
             }
             "asm" => {
                 // we expect on argument, which is a string literal (or an ident?). we will emit this again as Variable/Ident.

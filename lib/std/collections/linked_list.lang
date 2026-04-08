@@ -8,19 +8,21 @@ extern_def call_realloc;
 # Linked list over nodes {next^prev, payload} with List {head, tail, len}
 # A list is a ptr to some heap allocated List
 
-# Usage: linked_list &to;
-public begin_def linked_list to;
-	call_calloc to, 3, 8;
+# Usage: linked_list : to;
+public begin_def linked_list;
+	call_calloc 3, 8 : to;
+	return to;
 end_def
 
-# Usage: allocate_node &to;
-public begin_def allocate_node to;
-	call_calloc to, 2, 8;
+# Usage: allocate_node : to;
+public begin_def allocate_node;
+	call_calloc 2, 8 : to;
+	return to;
 end_def
 
-# Usage: ll_len list, &to;
-public begin_def ll_len list, to;
-	*to = *(list + 16);
+# Usage: ll_len list : to;
+public begin_def ll_len list;
+	return *(list + 16);
 end_def
 
 begin_def __bound_violation len, idx, msg;
@@ -38,8 +40,7 @@ end_def
 # Usage: ll_push_front list, value;
 public begin_def ll_push_front list, value;
 	_len_bytes = list + 16;
-	node = 0;
-	allocate_node &node;
+	allocate_node : node;
 	payload = node + 8;
 	*payload = value;
 
@@ -63,8 +64,7 @@ end_def
 # Usage: ll_push_tail list, value;
 public begin_def ll_push_tail list, value;
 	_len_bytes = list + 16;
-	node = 0;
-	allocate_node &node;
+	allocate_node : node;
 	payload = node + 8;
 	*payload = value;
 
@@ -86,19 +86,17 @@ public begin_def ll_push_tail list, value;
 	*_len_bytes = *_len_bytes + 1;
 end_def
 
-# Usage: ll_pop_front list, &to;
-public begin_def ll_pop_front list, to;
+# Usage: ll_pop_front list : to;
+public begin_def ll_pop_front list;
 	_len_bytes = list + 16;
-	if *_len_bytes; goto non_empty;
-	*to = 0;
-	goto exit;
+	if !*_len_bytes; return 0;
 
-	label non_empty;
 	if *_len_bytes == 1; goto one;
+
 	# list -> head -> next
 	# _ -> 0 ^ next -> prev ^ next
 	old_head = *list;
-	*to = *(old_head + 8);
+	to = *(old_head + 8);
 	***list = ***list ^ old_head;
 	*list = **list;
 	*_len_bytes = *_len_bytes - 1;
@@ -106,7 +104,7 @@ public begin_def ll_pop_front list, to;
 	goto exit;
 
 	label one;
-	*to = *(*list + 8);
+	to = *(*list + 8);
 	ll_drop_node *list;
 	*list = 0;
 	end = list + 8;
@@ -114,22 +112,21 @@ public begin_def ll_pop_front list, to;
 	*_len_bytes = 0;
 
 	label exit;
+	return to;
 end_def
 
-# Usage: ll_pop_tail list, &to;
-public begin_def ll_pop_tail list, to;
+# Usage: ll_pop_tail list : to;
+public begin_def ll_pop_tail list;
 	_len_bytes = list + 16;
-	if *_len_bytes; goto non_empty;
-	*to = 0;
-	goto exit;
+	if !*_len_bytes; return 0;
 
-	label non_empty;
 	if *_len_bytes == 1; goto one;
+
 	# list -> head -> next
 	# _ -> 0 ^ next -> prev ^ next
 	old_tail = list + 8;
 	old_tail_node = *old_tail;
-	*to = *(*old_tail + 8);
+	to = *(*old_tail + 8);
 	***old_tail = ***old_tail ^ *old_tail;
 	*old_tail = **old_tail;
 	*_len_bytes = *_len_bytes - 1;
@@ -137,7 +134,7 @@ public begin_def ll_pop_tail list, to;
 	goto exit;
 
 	label one;
-	*to = *(*(list + 8) + 8);
+	to = *(*(list + 8) + 8);
 	ll_drop_node *(list + 8);
 	*list = 0;
 	end = list + 8;
@@ -145,6 +142,7 @@ public begin_def ll_pop_tail list, to;
 	*_len_bytes = 0;
 
 	label exit;
+	return to;
 end_def
 
 begin_def __get_node_pair list, at, prev_node, next_node;
@@ -184,8 +182,8 @@ begin_def __get_node_pair list, at, prev_node, next_node;
 	label exit;
 end_def
 
-# Usage: ll_get list, at, &to;
-begin_def ll_get list, at, to;
+# Usage: ll_get list, at : to;
+begin_def ll_get list, at;
 	if !(*(list + 16) > at); __bound_violation *(list + 16), at, "in get";
 	if !at; goto head;
 	if at == *(list + 16); goto tail;
@@ -193,17 +191,18 @@ begin_def ll_get list, at, to;
 	prev = 0;
 	node = 0;
 	__get_node_pair list, at, &prev, &node;
-	*to = *(node + 8);
+	to = *(node + 8);
 	goto exit;
 
 	label tail;
-	*to = *(*(list + 8) + 8);
+	to = *(*(list + 8) + 8);
 	goto exit;
 
 	label head;
-	*to = *(*list + 8);
+	to = *(*list + 8);
 
 	label exit;
+	return to;
 end_def
 
 # Usage: ll_set list, at, value;
@@ -238,8 +237,7 @@ public begin_def ll_insert list, at, value;
 	if !at; goto front;
 	if *_len_bytes == at; goto tail;
 
-	node = 0;
-	allocate_node &node;
+	allocate_node : node;
 	payload = node + 8;
 	*payload = value;
 
@@ -262,8 +260,8 @@ public begin_def ll_insert list, at, value;
 	label exit;
 end_def
 
-# Usage: ll_remove list, at, &to;
-public begin_def ll_remove list, at, to;
+# Usage: ll_remove list, at : to;
+public begin_def ll_remove list, at;
 	_len_bytes = list + 16;
 	if !(*_len_bytes > at); __bound_violation *_len_bytes, at, "in remove";
 	if !at; goto front;
@@ -277,18 +275,19 @@ public begin_def ll_remove list, at, to;
 	*prev = *prev ^ node ^ next;
 	*next = *next ^ node ^ prev;
 
-	*to = *(node + 8);
+	to = *(node + 8);
 	ll_drop_node node;
 	*_len_bytes = *_len_bytes - 1;
 	goto exit;
 
 	label tail;
-	ll_pop_tail list, to;
+	ll_pop_tail list : to;
 	goto exit;
 	label front;
-	ll_pop_front list, to;
+	ll_pop_front list : to;
 
 	label exit;
+	return to;
 end_def
 
 # Usage: print_ll list;
@@ -337,15 +336,13 @@ extern_def test_assert_eq;
 cfg test;
 link_attr section tests;
 begin_def test_ll_len;
-    l = 0;
-    linked_list &l;
+    linked_list : l;
 
-    len = 0;
-    ll_len l, &len;
+    ll_len l : len;
     test_assert_eq len, 0;
 
     ll_push_front l, 10;
-    ll_len l, &len;
+    ll_len l : len;
     test_assert_eq len, 1;
 
     ll_drop_list l;
@@ -354,17 +351,15 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_ll_push;
-    l = 0;
-    linked_list &l;
+    linked_list : l;
 
     ll_push_front l, 10;
     ll_push_tail l, 20;
 
-    val = 0;
-    ll_get l, 0, &val;
+    ll_get l, 0 : val;
     test_assert_eq val, 10;
 
-    ll_get l, 1, &val;
+    ll_get l, 1 : val;
     test_assert_eq val, 20;
 
     ll_drop_list l;
@@ -373,17 +368,15 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_ll_pop;
-    l = 0;
-    linked_list &l;
+    linked_list : l;
 
     ll_push_front l, 10;
     ll_push_tail l, 20;
 
-    val = 0;
-    ll_pop_front l, &val;
+    ll_pop_front l : val;
     test_assert_eq val, 10;
 
-    ll_pop_tail l, &val;
+    ll_pop_tail l : val;
     test_assert_eq val, 20;
 
     ll_drop_list l;
@@ -392,8 +385,7 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_ll_insert;
-    l = 0;
-    linked_list &l;
+    linked_list : l;
 
     ll_push_front l, 10;
     ll_push_tail l, 30;
@@ -401,8 +393,7 @@ begin_def test_ll_insert;
 	ll_insert l, 0, 42;
 	ll_insert l, 3, 999;
 
-    val = 0;
-    ll_get l, 1, &val;
+    ll_get l, 1 : val;
     test_assert_eq val, 10;
 
     ll_drop_list l;
@@ -411,23 +402,21 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_ll_remove;
-    l = 0;
-    linked_list &l;
+    linked_list : l;
 
     ll_push_tail l, 10;
     ll_push_tail l, 20;
     ll_push_tail l, 30;
 
-    val = 0;
-    ll_remove l, 1, &val;
+    ll_remove l, 1 : val;
     test_assert_eq val, 20;
 
 	ll_push_front l, 42;
 
-	ll_remove l, 2, &val;
+	ll_remove l, 2 : val;
 	test_assert_eq val, 30;
 
-    ll_get l, 1, &val;
+    ll_get l, 1 : val;
     test_assert_eq val, 10;
 
     ll_drop_list l;
@@ -436,13 +425,11 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_ll_get;
-    l = 0;
-    linked_list &l;
+    linked_list : l;
     ll_push_tail l, 99;
     ll_push_tail l, 42;
 
-    val = 0;
-    ll_get l, 1, &val;
+    ll_get l, 1 : val;
     test_assert_eq val, 42;
 
     ll_drop_list l;
@@ -451,14 +438,12 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_ll_set;
-    l = 0;
-    linked_list &l;
+    linked_list : l;
     ll_push_front l, 10;
 
     ll_set l, 0, 99;
 
-    val = 0;
-    ll_get l, 0, &val;
+    ll_get l, 0 : val;
     test_assert_eq val, 99;
 
     ll_drop_list l;
@@ -467,8 +452,7 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_ll_integration;
-    l = 0;
-    linked_list &l;
+    linked_list : l;
 
     # 1. Build a baseline list: [10, 20, 30, 40, 50]
     ll_push_tail l, 10;
@@ -488,34 +472,33 @@ begin_def test_ll_integration;
     ll_insert l, 5, 45;
 
     # Verify insertions
-    val = 0;
-    ll_get l, 1, &val;
+    ll_get l, 1 : val;
     test_assert_eq val, 15;
 
-    ll_get l, 5, &val;
+    ll_get l, 5 : val;
     test_assert_eq val, 45;
 
     # 4. Test Forward Remove
     # Length is 7. Midpoint is 3. Index 2 < 3, so it walks FORWARD.
     # Removes '20'. List becomes: [10, 15, 30, 40, 45, 50]
-    ll_remove l, 2, &val;
+    ll_remove l, 2 : val;
 
     # 5. Test Backward Remove
     # Length is 6. Midpoint is 3. Index 4 > 3, so it walks BACKWARD.
     # Removes '45'. List becomes: [10, 15, 30, 40, 50]
-    ll_remove l, 4, &val;
+    ll_remove l, 4 : val;
 
     # Verify removals and structure integrity
-    ll_get l, 2, &val;
+    ll_get l, 2 : val;
     test_assert_eq val, 30; # The '30' should have shifted down to index 2
 
-    ll_get l, 4, &val;
+    ll_get l, 4 : val;
     test_assert_eq val, 50; # The '50' should have shifted down to index 4
 
     # 6. Test Set (Forward walk)
     # List becomes: [10, 99, 30, 40, 50]
     ll_set l, 1, 99;
-    ll_get l, 1, &val;
+    ll_get l, 1 : val;
     test_assert_eq val, 99;
 
     # 7. Test original pushes to front and back to ensure ends are still valid
@@ -523,11 +506,11 @@ begin_def test_ll_integration;
     ll_push_front l, 1;
     ll_push_tail l, 999;
 
-    ll_get l, 0, &val;
+    ll_get l, 0 : val;
     test_assert_eq val, 1;
 
     # Length is now 7. Last index is 6.
-    ll_get l, 6, &val;
+    ll_get l, 6 : val;
     test_assert_eq val, 999;
 
     ll_drop_list l;
@@ -537,8 +520,7 @@ cfg test;
 link_attr section tests;
 begin_def test_ll_drops;
 	# TODO
-    l = 0;
-    linked_list &l;
+    linked_list : l;
     ll_drop_list l;
     test_assert 1;
 end_def

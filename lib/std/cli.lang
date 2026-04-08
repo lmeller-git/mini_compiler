@@ -1,7 +1,7 @@
 # parses a pointer to an array of chars to an int and stores the result in *to
 # arg contains an entry of argv, i.e. the arguments passed by c rt at startup. arg points to a string which may be parsed to an integer.
-# Usage: parse_argv_to_int *(argv + _), to;
-public begin_def parse_argv_to_int arg, to;
+# Usage: parse_argv_to_int *(argv + _) : to;
+public begin_def parse_argv_to_int arg;
 	acc = 0;
 	i = 0;
 
@@ -15,5 +15,5 @@ public begin_def parse_argv_to_int arg, to;
 	goto parse_loop;
 
 	label exit;
-	*to = acc;
+	return acc;
 end_def

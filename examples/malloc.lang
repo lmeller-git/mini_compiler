@@ -1,7 +1,7 @@
 extern_def malloc size;
-extern_def c_call func, to, arg1, arg2, arg3, arg4;
-extern_def c_call_arr func, to, args;
-extern_def arr to, len;
+extern_def c_call func, arg1, arg2, arg3, arg4, arg5;
+extern_def c_call_arr func, args;
+extern_def arr len;
 extern_def arr_set array, at, with;
 extern_def print_arr array;
 
@@ -17,14 +17,12 @@ public begin_def main argc, argv;
 	i = i + 1;
 	if i < argc; goto print_loop;
 
-	malloc_loc = 0;
-	addr_of malloc, &malloc_loc;
+	addr_of malloc : malloc_loc;
 	print malloc_loc;
 	print_str "\n";
 
-	heap_location = 0;
 
-	c_call malloc_loc, &heap_location, 1;
+	c_call malloc_loc, 1 : heap_location;
 
 	print heap_location;
 	print_str "\n";
@@ -37,9 +35,7 @@ public begin_def main argc, argv;
 	print *heap_location;
 	print_str "\n";
 
-	array = 0;
-	arr &array, 9;
-	heap_location = 0;
+	arr 9 : array;
 
 	arr_set array, 0, &1;
 	arr_set array, 1, &2;
@@ -53,8 +49,6 @@ public begin_def main argc, argv;
 
 	print_arr array;
 	print_str "\n";
-
-	c_call_arr malloc_loc, &heap_location, array;
 
 	print heap_location;
 	print_str "\n";

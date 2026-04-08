@@ -14,27 +14,27 @@ extern_def println;
 # Vectors store cap at vec_ptr - 16 and length at vec_ptr - 8
 
 # Allocates a new vector with cap cap and stores its address in *to
-# Usage: vec &to, cap;
-public begin_def vec to, cap;
-	call_calloc to, cap + 3, 8;
-	if !*to; panic "ran out of heap memory";
-	**to = cap + 1;
-	*to = *to + 16;
+# Usage: vec cap : to;
+public begin_def vec cap;
+	call_calloc cap + 3, 8 : to;
+	if !to; panic "ran out of heap memory";
+	*to = cap + 1;
+	return to + 16;
 end_def
 
-# Usage: vec_len vector, &to;
-public begin_def vec_len vector, to;
-	*to = *(vector - 8);
+# Usage: vec_len vector : to;
+public begin_def vec_len vector;
+	return *(vector - 8);
 end_def
 
-# Usage: vec_cap vector, &to;
-public begin_def vec_cap vector, to;
-	*to = *(vector - 16);
+# Usage: vec_cap vector : to;
+public begin_def vec_cap vector;
+	return *(vector - 16);
 end_def
 
 # Internal
-# Usage __realloc_vec &new, old;
-begin_def __realloc_vec new, old;
+# Usage __realloc_vec old : new;
+begin_def __realloc_vec old;
 	old_cap = *(old - 16);
 	old_len = *(old - 8);
 
@@ -46,13 +46,13 @@ begin_def __realloc_vec new, old;
 	old_cap = old_cap * 2;
 
 	label realloc;
-	call_realloc new, old - 16, old_cap * 8 + 16;
+	call_realloc old - 16, old_cap * 8 + 16 : new;
 
-	if !*new; panic "ran out of heap memory";
-	**new = old_cap;
-	_len_bytes = *new + 8;
+	if !new; panic "ran out of heap memory";
+	*new = old_cap;
+	_len_bytes = new + 8;
 	*_len_bytes = old_len;
-	*new = *new + 16;
+	return new + 16;
 end_def
 
 # Internal
@@ -66,10 +66,10 @@ begin_def __bound_violation length, idx, msg;
 	panic msg;
 end_def
 
-# Usage vec_get vector, at, &to;
-public begin_def vec_get vector, at, to;
+# Usage vec_get vector, at : to;
+public begin_def vec_get vector, at;
 	if !(*(vector - 8) > at); __bound_violation *(vector - 8), at, "in get";
-	*to = *(vector + at * 8);
+	return *(vector + at * 8);
 end_def
 
 # Usage: vec_set vector, at, value;
@@ -84,7 +84,7 @@ public begin_def vec_push vector, value;
 	_len_bytes = *vector - 8;
 	if *(*vector - 16) > *_len_bytes; goto push;
 	# need to realloc
-	__realloc_vec vector, *vector;
+	__realloc_vec *vector : *vector;
 
 	_len_bytes = *vector - 8;
 
@@ -106,7 +106,7 @@ public begin_def vec_insert vector, value, at;
 	label within;
 	if *(*vector - 16) > *_len_bytes; goto insert;
 	# need to realloc
-	__realloc_vec vector, *vector;
+	__realloc_vec *vector : *vector;
 	_len_bytes = *vector - 8;
 
 	label insert;
@@ -119,37 +119,34 @@ public begin_def vec_insert vector, value, at;
 	label exit;
 end_def
 
-# Usage: vec_pop &vector, &to;
-public begin_def vec_pop vector, to;
+# Usage: vec_pop &vector : to;
+public begin_def vec_pop vector;
 	_len_bytes = *vector - 8;
 	if *_len_bytes; goto non_empty;
-	*to = 0;
-	goto exit;
+	return  0;
 
 	label non_empty;
 	*_len_bytes = *_len_bytes - 1;
 	_popped_from_bytes = *vector + *_len_bytes * 8;
-	*to = *_popped_from_bytes;
+	v = *_popped_from_bytes;
 	*_popped_from_bytes = 0;
-
-	label exit;
+	return v;
 end_def
 
-# Usage: vec_remove &vector, from, &to
-public begin_def vec_remove vector, from, to;
+# Usage: vec_remove &vector, from : to
+public begin_def vec_remove vector, from;
 	_len_bytes = *vector - 8;
 	if from < *_len_bytes; goto within;
 	if from > *_len_bytes; __bound_violation *_len_bytes, from, "in remove";
 	# this remove is a pop (from == len)
-	vec_pop vector, to;
-	goto exit;
+	vec_pop vector : to;
+	return to;
 
 	label within;
-	*to = *(*vector + 8 * from);
+	v = *(*vector + 8 * from);
 	call_memmove *vector + from * 8, *vector + from * 8 + 8, (*_len_bytes - from) * 8 - 8;
 	*_len_bytes = *(*vector - 8) - 1;
-
-	label exit;
+	return v;
 end_def
 
 # Usage: vec_drop vector;
@@ -183,14 +180,13 @@ extern_def test_assert_eq;
 cfg test;
 link_attr section tests;
 begin_def test_vec_len;
-    v = 0;
-    vec &v, 5;
-    len = 0;
-    vec_len v, &len;
+    vec 5 : v;
+
+    vec_len v : len;
     test_assert_eq len, 0;
 
     vec_push &v, 42;
-    vec_len v, &len;
+    vec_len v : len;
     test_assert_eq len, 1;
 
     vec_drop v;
@@ -199,10 +195,9 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_vec_cap;
-    v = 0;
-    vec &v, 10;
-    cap = 0;
-    vec_cap v, &cap;
+    vec 10 : v;
+
+    vec_cap v : cap;
     test_assert_eq cap, 11;
 
     vec_drop v;
@@ -211,16 +206,14 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_vec_push;
-    v = 0;
-    vec &v, 2;
+    vec 2 : v;
     vec_push &v, 100;
     vec_push &v, 200;
 
-    val = 0;
-    vec_get v, 0, &val;
+    vec_get v, 0 : val;
     test_assert_eq val, 100;
 
-    vec_get v, 1, &val;
+    vec_get v, 1 : val;
     test_assert_eq val, 200;
 
     vec_drop v;
@@ -229,16 +222,13 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_vec_pop;
-    v = 0;
-    vec &v, 5;
+    vec 5 : v;
     vec_push &v, 77;
 
-    val = 0;
-    vec_pop &v, &val;
+    vec_pop &v : val;
     test_assert_eq val, 77;
 
-    len = 0;
-    vec_len v, &len;
+    vec_len v : len;
     test_assert_eq len, 0;
 
     vec_drop v;
@@ -247,18 +237,16 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_vec_insert;
-    v = 0;
-    vec &v, 5;
+    vec 5 : v;
     vec_push &v, 10;
     vec_push &v, 30;
 
     vec_insert &v, 20, 1;
 
-    val = 0;
-    vec_get v, 1, &val;
+    vec_get v, 1 : val;
     test_assert_eq val, 20;
 
-    vec_get v, 2, &val;
+    vec_get v, 2 : val;
     test_assert_eq val, 30;
 
     vec_drop v;
@@ -267,17 +255,15 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_vec_remove;
-    v = 0;
-    vec &v, 5;
+    vec 5 : v;
     vec_push &v, 10;
     vec_push &v, 20;
     vec_push &v, 30;
 
-    val = 0;
-    vec_remove &v, 1, &val;
+    vec_remove &v, 1 : val;
     test_assert_eq val, 20;
 
-    vec_get v, 1, &val;
+    vec_get v, 1 : val;
     test_assert_eq val, 30;
 
     vec_drop v;
@@ -286,12 +272,10 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_vec_get;
-    v = 0;
-    vec &v, 3;
+    vec 3 : v;
     vec_push &v, 42;
 
-    val = 0;
-    vec_get v, 0, &val;
+    vec_get v, 0 : val;
     test_assert_eq val, 42;
 
     vec_drop v;
@@ -300,13 +284,11 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_vec_set;
-    v = 0;
-    vec &v, 3;
+    vec 3 : v;
     vec_push &v, 10;
     vec_set v, 0, 99;
 
-    val = 0;
-    vec_get v, 0, &val;
+    vec_get v, 0 : val;
     test_assert_eq val, 99;
 
     vec_drop v;
@@ -315,18 +297,16 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_vec_integration;
-    v = 0;
-    vec &v, 1;
+    vec 1 : v;
     vec_push &v, 1;
     vec_push &v, 2;
     vec_push &v, 3;
 
-    val = 0;
-    vec_pop &v, &val;
+    vec_pop &v : val;
     test_assert_eq val, 3;
 
     vec_set v, 0, 5;
-    vec_get v, 0, &val;
+    vec_get v, 0 : val;
     test_assert_eq val, 5;
 
     vec_drop v;
@@ -335,8 +315,7 @@ end_def
 cfg test;
 link_attr section tests;
 begin_def test_vec_drops;
-    v = 0;
-    vec &v, 1;
+    vec 1 : v;
     vec_drop v;
     test_assert 1;
 end_def
