@@ -79,6 +79,7 @@ pub enum Token<'a> {
     Shl,
     Comma,
     Comment,
+    Colon,
     EOF,
 }
 
@@ -111,6 +112,7 @@ impl<'a> Token<'a> {
                     '(' => break 'outer Token::OpenParen,
                     ')' => break 'outer Token::CloseParen,
                     ';' => break 'outer Token::Semi,
+                    ':' => break 'outer Token::Colon,
                     '|' => break 'outer Token::Or,
                     '&' => break 'outer Token::Ampercent,
                     ',' => break 'outer Token::Comma,

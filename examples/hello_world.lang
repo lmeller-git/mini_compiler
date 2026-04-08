@@ -3,12 +3,13 @@
 begin_def hello input1, input2;
 	print_str input1;
 	print_str input2;
+	return 1;
 end_def
 
 public begin_def main;
 	hello_world = "hello world\n"; # This is a string
 	print_str hello_world; # This prints a string
-	hello hello_world, "from func hello\n";
+	hello hello_world, "from func hello\n" : return_value;
 
-	if 1; if !0; print_str "this is an if\n";
+	if return_value; if !0; print_str "this is an if\n";
 end_def

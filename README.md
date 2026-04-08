@@ -55,7 +55,11 @@ end_def
 
 Declare a variable with:
 
-```<ident> = <expr>;```
+```<lvalue> = <expr>;```
+
+A `lvalue` is just an optionally dereferenced `ident`:
+
+```('*')*<ident>```
 
 All variables are qwords.
 
@@ -67,6 +71,8 @@ begin_def <ident> [ <ident> ( ',' <ident> )* ] ;
 end_def
 ```
 
+Values may be returned from functions using builting function `return`.
+
 Referance an external function with:
 
 ```
@@ -75,7 +81,7 @@ Referance an external function with:
 
 Call a function with:
 
-```<ident> [ <expr> ( ',' <expr> )* ];```
+```<ident> [ <expr> ( ',' <expr> )* ] [ ':' <lvalue> ];```
 
 Execute some code conditionally with:
 
@@ -147,6 +153,7 @@ The current supported builtin functions are
 - label
 - goto
 - addr_of
+- return
 
 ## Supported targets
 

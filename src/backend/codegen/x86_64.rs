@@ -149,10 +149,10 @@ impl AsmWriter {
 
     fn write_unit(&mut self, unit: &CodeUnit, all_vars: &mut Vars, temps: &mut TempVarStack) {
         match unit {
-            CodeUnit::FuncCall { name, args } => {
+            CodeUnit::FuncCall { name, args, dest } => {
                 let func_name = self.get_func_name(name);
                 if is_builtin_func(name) {
-                    self.call_builtin(name, args, all_vars, temps);
+                    self.call_builtin(name, args, dest, all_vars, temps);
                 } else {
                     if args.len() > 6 {
                         panic!("currently only call via register supported. Use 6 or less args");
@@ -179,6 +179,11 @@ impl AsmWriter {
                     temps.dec_stack(8 * saved_regs.len());
                     for reg in saved_regs.into_iter().rev() {
                         self.write_in_fn(format_args!("pop {}", reg));
+                    }
+
+                    if let Some(Operand::Temp(dest)) = dest {
+                        let temp = self.get_or_init_temp(dest, temps);
+                        self.write_in_fn(format_args!("mov {}, rax", temp));
                     }
                 }
             }
@@ -264,10 +269,12 @@ impl AsmWriter {
         }
     }
 
+    // TODO use _ret for return values in addr_of, ...
     fn call_builtin(
         &mut self,
         name: &str,
         args: &[Operand],
+        _ret: &Option<Operand>,
         vars: &Vars,
         temps: &mut TempVarStack,
     ) {
@@ -288,6 +295,17 @@ impl AsmWriter {
                     self.get_var_str(&args[0], vars, temps)
                 ));
                 self.write_in_fn(format_args!("call exit"));
+            }
+            "return" => {
+                if let Some(ret) = args.first() {
+                    self.write_in_fn(format_args!(
+                        "mov rax, {}",
+                        self.get_var_str(ret, vars, temps)
+                    ));
+                }
+                // add back the previously substracted 8 bytes for return
+                self.write_in_fn(format_args!("add rsp, 8"));
+                self.write_in_fn(format_args!("ret"));
             }
             "addr_of" => self.builtin_addr_of(args, vars, temps),
             "goto" => self.write_in_fn(format_args!("jmp {}", args[0])),

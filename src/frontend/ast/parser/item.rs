@@ -75,14 +75,16 @@ impl Ast {
                     );
 
                     skip_next = false;
-                    skip_until!(
+                    skip_until_or_over!(
                         s,
                         Token::Keyword("begin_def")
                             | Token::Keyword("extern_def")
                             | Token::Keyword("public")
                             | Token::Keyword("cfg")
                             | Token::Keyword("link_attr")
-                    )
+                            | Token::Semi,
+                        Token::Semi
+                    );
                 }
             }
         }

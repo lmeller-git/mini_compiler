@@ -57,23 +57,35 @@ impl Line {
                         (_, LValue::Variable(func)) => {
                             let mut exprs = Vec::new();
 
-                            while *stream.peek().as_ref() != Token::Semi {
+                            while *stream.peek().as_ref() != Token::Semi
+                                && *stream.peek().as_ref() != Token::Colon
+                            {
                                 exprs.push(parse_expr(stream, 0., diagnostics));
                                 let next = stream.peek();
 
                                 if *next.as_ref() == Token::Comma {
                                     stream.advance();
-                                } else if *next.as_ref() != Token::Semi {
+                                } else if !matches!(*next.as_ref(), Token::Semi | Token::Colon) {
                                     unclosed_block!(
                                         diagnostics,
-                                        [Token::Semi, Token::Comma],
+                                        [Token::Semi, Token::Comma, Token::Colon],
                                         next.clone(),
                                         anchor.clone().merge(stream.last_span.clone())
                                     );
                                     break 'parse_inner Self::Malformed;
                                 }
                             }
-                            Self::Call(func, exprs)
+                            let mut ret = None;
+                            if *stream.peek().as_ref() == Token::Colon {
+                                stream.advance();
+                                let lvalue = LValue::from_tokens(stream, diagnostics);
+                                if lvalue == LValue::Malformed {
+                                    break 'parse_inner Self::Malformed;
+                                }
+                                ret.replace(lvalue);
+                            }
+
+                            Self::Call(func, exprs, ret)
                         }
                         (_, _) => {
                             unexpected!(

@@ -89,6 +89,7 @@ pub enum CodeUnit {
     FuncCall {
         name: String,
         args: Vec<Operand>,
+        dest: Option<Operand>,
     },
     Operation {
         op: Operation,
@@ -162,16 +163,30 @@ impl CodeBuilder {
     fn lower_line(&mut self, line: &Line) {
         match line {
             Line::Expr(e) => _ = self.lower_unit(e),
-            Line::Call(f, e) => {
+            Line::Call(f, e, ret) => {
                 let args = if is_builtin_func(f) {
                     self.lower_builtin(f, e)
                 } else {
                     e.iter().map(|e| self.lower_unit(e)).collect()
                 };
+
+                let dest = ret.as_ref().map(|_| Operand::Temp(self.new_temp()));
+
                 self.inner.units.push(CodeUnit::FuncCall {
                     name: f.clone(),
                     args,
+                    dest: dest.clone(),
                 });
+
+                if let Some(dest) = dest
+                    && let Some(ret) = ret
+                {
+                    let mut name = ret.clone();
+                    self.rename_lvalue(&mut name);
+                    self.inner
+                        .units
+                        .push(CodeUnit::Assignment { name, value: dest });
+                }
             }
             Line::Decl(v, e) => {
                 let val = self.lower_unit(e);
@@ -360,6 +375,7 @@ mod tests {
                 CodeUnit::FuncCall {
                     name: "print".into(),
                     args: vec![Operand::Temp("_temp_2".into())],
+                    dest: None,
                 },
                 CodeUnit::Cleanup,
                 CodeUnit::Operation {

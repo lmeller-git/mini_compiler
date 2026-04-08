@@ -9,7 +9,7 @@ pub mod parser;
 pub(crate) fn is_builtin_func(ident: &str) -> bool {
     matches!(
         ident,
-        "print_str" | "print" | "exit" | "goto" | "label" | "addr_of" | "asm"
+        "print_str" | "print" | "exit" | "goto" | "label" | "addr_of" | "asm" | "return"
     )
 }
 
@@ -95,7 +95,7 @@ impl Function {
 pub enum Line {
     Expr(Expr),
     Decl(LValue, Expr),
-    Call(String, Vec<Expr>),
+    Call(String, Vec<Expr>, Option<LValue>),
     Cond(Expr, Box<Line>),
     Malformed,
 }
@@ -224,14 +224,15 @@ impl Display for Line {
         match self {
             Self::Expr(e) => write!(f, "{}", e),
             Self::Decl(i, e) => write!(f, "declare {} = {}", i, e),
-            Self::Call(i, e) => write!(
+            Self::Call(i, e, ret) => write!(
                 f,
-                "call {} {}",
+                "call {} {} : {:?}",
                 i,
                 e.iter()
                     .map(|ele| ele.to_string())
                     .collect::<Vec<_>>()
-                    .join(",")
+                    .join(","),
+                ret
             ),
             Self::Cond(c, e) => write!(f, "if {}; {}", c, e),
             Self::Malformed => write!(f, "malformed"),
@@ -277,7 +278,7 @@ mod tests {
         let ast = Ast::from_stream(&mut stream, &CfgEnv::default());
         assert_eq!(
             format!("{}", ast.0),
-            "fn main() {\ndeclare x = (1 + 2);\ncall print (x * (5 + 2));\ndeclare y = (x / (3 + 2));\ndeclare k = (x + ((y / 5) * 4));\n};\n"
+            "fn main() {\ndeclare x = (1 + 2);\ncall print (x * (5 + 2)) : None;\ndeclare y = (x / (3 + 2));\ndeclare k = (x + ((y / 5) * 4));\n};\n"
         )
     }
 }
