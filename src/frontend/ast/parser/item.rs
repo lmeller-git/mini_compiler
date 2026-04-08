@@ -75,15 +75,13 @@ impl Ast {
                     );
 
                     skip_next = false;
-                    skip_until_or_over!(
+                    skip_until!(
                         s,
                         Token::Keyword("begin_def")
                             | Token::Keyword("extern_def")
                             | Token::Keyword("public")
                             | Token::Keyword("cfg")
                             | Token::Keyword("link_attr")
-                            | Token::Semi,
-                        Token::Semi
                     );
                 }
             }
@@ -126,7 +124,14 @@ impl LinkAttr {
                                 anchor.merge(stream.peek().span.clone())
                             );
 
-                            skip_until_or_over!(stream, kw!(Token::Semi), Token::Semi);
+                            skip_until!(
+                                stream,
+                                Token::Keyword("begin_def")
+                                    | Token::Keyword("extern_def")
+                                    | Token::Keyword("public")
+                                    | Token::Keyword("cfg")
+                                    | Token::Keyword("link_attr")
+                            );
                             continue;
                         }
                     }
@@ -150,7 +155,14 @@ impl LinkAttr {
                         anchor
                     );
 
-                    skip_until_or_over!(stream, kw!(Token::Semi), Token::Semi);
+                    skip_until!(
+                        stream,
+                        Token::Keyword("begin_def")
+                            | Token::Keyword("extern_def")
+                            | Token::Keyword("public")
+                            | Token::Keyword("cfg")
+                            | Token::Keyword("link_attr")
+                    );
                     continue;
                 }
             }
@@ -164,7 +176,14 @@ impl LinkAttr {
                 );
             }
 
-            skip_until_or_over!(stream, kw!(Token::Semi), Token::Semi);
+            skip_until!(
+                stream,
+                Token::Keyword("begin_def")
+                    | Token::Keyword("extern_def")
+                    | Token::Keyword("public")
+                    | Token::Keyword("cfg")
+                    | Token::Keyword("link_attr")
+            );
         }
 
         zelf
