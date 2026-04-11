@@ -3,7 +3,7 @@ use crate::{
     frontend::{
         ast::{
             LValue, Line,
-            error::{AstErr, Diagnostics},
+            error::{AstErr, Diagnostics, IntoSpanned},
             parser::expr::parse_expr,
         },
         lexer::{Token, TokenStream},
@@ -46,13 +46,19 @@ impl Line {
         let line = match stream.peek().as_ref() {
             Token::Ident(_) | Token::Star => {
                 let var = LValue::from_tokens(stream, diagnostics);
+                let lvalue_end = stream.last_span.clone();
 
                 'parse_inner: {
                     match (stream.peek().as_ref(), var) {
                         (_, LValue::Malformed) => Self::Malformed,
                         (Token::Eq, var) => {
                             stream.advance();
-                            Self::Decl(var, parse_expr(stream, 0., diagnostics))
+                            let rhs_start = stream.peek().span.clone();
+                            Self::Decl(
+                                var.into_spanned(anchor.clone().merge(lvalue_end)),
+                                parse_expr(stream, 0., diagnostics)
+                                    .into_spanned(rhs_start.merge(stream.last_span.clone())),
+                            )
                         }
                         (_, LValue::Variable(func)) => {
                             let mut exprs = Vec::new();
@@ -60,7 +66,11 @@ impl Line {
                             while *stream.peek().as_ref() != Token::Semi
                                 && *stream.peek().as_ref() != Token::Colon
                             {
-                                exprs.push(parse_expr(stream, 0., diagnostics));
+                                let expr_start = stream.peek().span.clone();
+                                exprs.push(
+                                    parse_expr(stream, 0., diagnostics)
+                                        .into_spanned(expr_start.merge(stream.last_span.clone())),
+                                );
                                 let next = stream.peek();
 
                                 if *next.as_ref() == Token::Comma {
@@ -78,14 +88,22 @@ impl Line {
                             let mut ret = None;
                             if *stream.peek().as_ref() == Token::Colon {
                                 stream.advance();
+                                let lvalue_start = stream.peek().span.clone();
                                 let lvalue = LValue::from_tokens(stream, diagnostics);
                                 if lvalue == LValue::Malformed {
                                     break 'parse_inner Self::Malformed;
                                 }
-                                ret.replace(lvalue);
+                                ret.replace(
+                                    lvalue
+                                        .into_spanned(lvalue_start.merge(stream.last_span.clone())),
+                                );
                             }
 
-                            Self::Call(func, exprs, ret)
+                            Self::Call(
+                                func.into_spanned(anchor.clone().merge(lvalue_end)),
+                                exprs,
+                                ret,
+                            )
                         }
                         (_, _) => {
                             unexpected!(
@@ -101,13 +119,19 @@ impl Line {
             }
             Token::Keyword(kw) if matches!(kw, &"if") => {
                 stream.advance();
+                let cond_start = stream.peek().span.clone();
                 let cond = parse_expr(stream, 0., diagnostics);
+                let cond_span = cond_start.merge(stream.last_span.clone());
 
                 expect!(stream, diagnostics, anchor, [Token::Semi], unclosed_block);
 
+                let then_start = stream.peek().span.clone();
                 let then = Self::parse(stream, diagnostics);
                 // then consumed the Semi already
-                return Self::Cond(cond, Box::new(then));
+                return Self::Cond(
+                    cond.into_spanned(cond_span),
+                    Box::new(then.into_spanned(then_start.merge(stream.last_span.clone()))),
+                );
             }
             Token::EOF => {
                 diagnostics.errs.push(

@@ -2,7 +2,7 @@ use crate::{
     frontend::{
         ast::{
             Expr, Operation, Val,
-            error::{AstErr, Diagnostics, Spanned},
+            error::{AstErr, Diagnostics, IntoSpanned, Spanned},
         },
         lexer::{Token, TokenStream},
     },
@@ -58,12 +58,19 @@ pub fn parse_expr<'a>(
         }
         _tok => {
             if let Some(op) = Operation::try_from_token_as_single(stream.peek()) {
+                let lhs_span = stream.last_span.clone();
+                let op_span = stream.peek().span.clone();
                 stream.advance();
+                let rhs_span = stream.peek().span.clone();
                 let rhs = parse_expr(stream, op.infix_power().0, diagnostics);
                 if rhs == Expr::Malformed {
                     return Expr::Malformed;
                 }
-                Expr::Op(Box::new(Expr::Val(Val::V(0))), op, Box::new(rhs))
+                Expr::Op(
+                    Box::new(Expr::Val(Val::V(0)).into_spanned(anchor.clone().merge(lhs_span))),
+                    op.into_spanned(op_span),
+                    Box::new(rhs.into_spanned(rhs_span.merge(stream.last_span.clone()))),
+                )
             } else {
                 unexpected!(
                     diagnostics,
@@ -85,16 +92,23 @@ pub fn parse_expr<'a>(
     };
 
     while let Some(op) = Operation::try_from_token(stream.peek()) {
+        let lhs_end = stream.last_span.clone();
+        let op_span = stream.peek().span.clone();
         let (l, r) = op.infix_power();
         if r < min_bp {
             break;
         }
         stream.advance();
+        let rhs_span = stream.peek().span.clone();
         let rhs = parse_expr(stream, l, diagnostics);
         if rhs == Expr::Malformed {
             return Expr::Malformed;
         }
-        lhs = Expr::Op(Box::new(lhs), op, Box::new(rhs));
+        lhs = Expr::Op(
+            Box::new(lhs.into_spanned(anchor.clone().merge(lhs_end))),
+            op.into_spanned(op_span),
+            Box::new(rhs.into_spanned(rhs_span.merge(stream.last_span.clone()))),
+        );
     }
     lhs
 }

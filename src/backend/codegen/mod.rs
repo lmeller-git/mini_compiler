@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 use indexmap::IndexMap;
 
 use crate::frontend::ast::{
-    Ast, Expr, Item, LValue, Line, LinkAttr, Operation, Val, is_builtin_func,
+    Ast, Expr, Item, LValue, Line, LinkAttr, Operation, Val, error::Spanned, is_builtin_func,
 };
 pub mod x86_64;
 
@@ -21,26 +21,27 @@ impl ProgramIR {
                 continue;
             };
             let code = if let Some(func_body) = func.body() {
-                builder.build(func_body, func.name.clone())
+                builder.build(func_body, func.name.as_ref().clone())
             } else {
                 CodeTree::default()
             };
 
             functions.insert(
-                func.name.clone(),
+                func.name.as_ref().clone(),
                 FunctionIR {
                     body: code,
-                    name: func.name.clone(),
+                    name: func.name.as_ref().clone(),
                     args: func
                         .args
-                        .clone()
-                        .into_iter()
+                        .iter()
+                        .map(|a| a.as_ref())
+                        .cloned()
                         .map(|mut arg| {
                             builder.rename_ident(&mut arg);
                             arg
                         })
                         .collect(),
-                    link_attr: func.link_attr.clone(),
+                    link_attr: func.link_attr.as_ref().clone(),
                 },
             );
         }
@@ -173,7 +174,7 @@ impl CodeBuilder {
                 let dest = ret.as_ref().map(|_| Operand::Temp(self.new_temp()));
 
                 self.inner.units.push(CodeUnit::FuncCall {
-                    name: f.clone(),
+                    name: f.as_ref().clone(),
                     args,
                     dest: dest.clone(),
                 });
@@ -183,18 +184,20 @@ impl CodeBuilder {
                 {
                     let mut name = ret.clone();
                     self.rename_lvalue(&mut name);
-                    self.inner
-                        .units
-                        .push(CodeUnit::Assignment { name, value: dest });
+                    self.inner.units.push(CodeUnit::Assignment {
+                        name: name.as_ref().clone(),
+                        value: dest,
+                    });
                 }
             }
             Line::Decl(v, e) => {
                 let val = self.lower_unit(e);
                 let mut name = v.clone();
                 self.rename_lvalue(&mut name);
-                self.inner
-                    .units
-                    .push(CodeUnit::Assignment { name, value: val });
+                self.inner.units.push(CodeUnit::Assignment {
+                    name: name.as_ref().clone(),
+                    value: val,
+                });
             }
             Line::Cond(cond, then) => {
                 let cond = self.lower_unit(cond);
@@ -215,14 +218,14 @@ impl CodeBuilder {
         }
     }
 
-    fn lower_builtin(&mut self, name: &str, exprs: &[Expr]) -> Vec<Operand> {
+    fn lower_builtin(&mut self, name: &str, exprs: &[Spanned<Expr>]) -> Vec<Operand> {
         match name {
             "addr_of" => {
                 // here we expect one args: [Variable(Ident)]
                 // We search the current function for variables of matching names, if one is found we return its addr, else we assume this to be an external symbol
                 debug_assert_eq!(exprs.len(), 1);
                 let var = &exprs[0];
-                let Expr::Val(Val::Var(ident)) = var else {
+                let Expr::Val(Val::Var(ident)) = var.as_ref() else {
                     panic!("currently only idents may be passed to addr_of");
                 };
 
@@ -249,7 +252,8 @@ impl CodeBuilder {
             "asm" => {
                 // we expect on argument, which is a string literal (or an ident?). we will emit this again as Variable/Ident.
                 debug_assert_eq!(exprs.len(), 1);
-                let (Expr::Val(Val::Var(lit)) | Expr::Val(Val::Lit(lit))) = &exprs[0] else {
+                let (Expr::Val(Val::Var(lit)) | Expr::Val(Val::Lit(lit))) = exprs[0].as_ref()
+                else {
                     panic!("cannot interpret non string literals/idents as assembly");
                 };
                 vec![Operand::Variable(lit.to_string())]
@@ -292,7 +296,7 @@ impl CodeBuilder {
                 let rhs = self.lower_unit(rhs.as_ref());
                 let res = self.new_temp();
                 self.inner.units.push(CodeUnit::Operation {
-                    op: *op,
+                    op: *op.as_ref(),
                     lhs,
                     rhs,
                     dest: Operand::Temp(res.clone()),

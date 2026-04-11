@@ -7,7 +7,7 @@ use crate::{
 };
 
 pub mod ast;
-mod lexer;
+pub mod lexer;
 
 pub fn get_ast<'a>(s: &'a str, cfg_env: &CfgEnv) -> (Ast, Diagnostics<'a>) {
     let mut token_stream = TokenStream::from_str(s).map_err(FrontendErr::Lex).unwrap();

@@ -35,7 +35,7 @@ impl CfgEnv {
                 crate::frontend::ast::Val::Var(str) => self.flags.contains(str),
                 _ => false,
             },
-            Expr::Op(lhs, op, rhs) => match op {
+            Expr::Op(lhs, op, rhs) => match op.as_ref() {
                 Operation::BitAND => {
                     let lhs = self.eval_cfg_expr(lhs.as_ref());
                     if !lhs {

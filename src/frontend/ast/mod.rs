@@ -2,6 +2,8 @@ use std::fmt::{Debug, Display};
 
 use indexmap::IndexMap;
 
+use crate::frontend::ast::error::Spanned;
+
 pub mod cfg;
 pub mod error;
 pub mod parser;
@@ -73,16 +75,16 @@ pub enum LinkMeta {
 
 #[derive(Debug)]
 pub enum Item {
-    Function(Function),
+    Function(Spanned<Function>),
     Malformed,
 }
 
 #[derive(Debug)]
 pub struct Function {
-    pub name: String,
-    pub body: Option<Vec<Line>>,
-    pub args: Vec<String>,
-    pub link_attr: LinkAttr,
+    pub name: Spanned<String>,
+    pub body: Option<Spanned<Vec<Line>>>,
+    pub args: Vec<Spanned<String>>,
+    pub link_attr: Spanned<LinkAttr>,
 }
 
 impl Function {
@@ -93,17 +95,17 @@ impl Function {
 
 #[derive(PartialEq, Eq)]
 pub enum Line {
-    Expr(Expr),
-    Decl(LValue, Expr),
-    Call(String, Vec<Expr>, Option<LValue>),
-    Cond(Expr, Box<Line>),
+    Expr(Spanned<Expr>),
+    Decl(Spanned<LValue>, Spanned<Expr>),
+    Call(Spanned<String>, Vec<Spanned<Expr>>, Option<Spanned<LValue>>),
+    Cond(Spanned<Expr>, Box<Spanned<Line>>),
     Malformed,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Expr {
     Val(Val),
-    Op(Box<Expr>, Operation, Box<Expr>),
+    Op(Box<Spanned<Expr>>, Spanned<Operation>, Box<Spanned<Expr>>),
     Malformed,
 }
 
@@ -163,7 +165,16 @@ impl Debug for Line {
 impl Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "fn {}(", self.name)?;
-        writeln!(f, "{}) {{", self.args.join(","))?;
+        writeln!(
+            f,
+            "{}) {{",
+            self.args
+                .iter()
+                .map(|item| item.as_ref())
+                .cloned()
+                .collect::<Vec<String>>()
+                .join(",")
+        )?;
         if let Some(body) = self.body() {
             for line in body {
                 writeln!(f, "{};", line)?;

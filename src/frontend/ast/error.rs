@@ -1,8 +1,11 @@
-use std::ops::Range;
+use std::{
+    fmt::Display,
+    ops::{Deref, DerefMut, Range},
+};
 
 use ariadne::{Label, Report, ReportBuilder, ReportKind, Source};
 
-use crate::frontend::lexer::{Span, Token};
+use crate::frontend::lexer::Token;
 
 #[macro_export]
 macro_rules! unexpected {
@@ -74,12 +77,76 @@ impl<'a> Diagnostics<'a> {
     }
 }
 
+pub trait IntoSpanned
+where
+    Self: Sized,
+{
+    fn into_spanned(self, span: Span) -> Spanned<Self> {
+        Spanned::new(self, span)
+    }
+}
+
+impl<T> IntoSpanned for T {}
+
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct Spanned<T> {
     pub inner: T,
     pub span: Span,
 }
 
+impl<T> Spanned<T> {
+    pub fn new(v: T, span: Span) -> Self {
+        Self { inner: v, span }
+    }
+
+    pub fn map<U, F>(self, f: F) -> Spanned<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        Spanned {
+            inner: f(self.inner),
+            span: self.span,
+        }
+    }
+}
+
+impl<T> AsRef<T> for Spanned<T> {
+    fn as_ref(&self) -> &T {
+        self
+    }
+}
+
+impl<T> Deref for Spanned<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T> DerefMut for Spanned<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl<T: Display> Display for Spanned<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_ref())
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+}
+
+impl Span {
+    pub fn merge(mut self, other: Span) -> Self {
+        self.end = other.end.max(self.end);
+        self.start = other.start.midpoint(self.start);
+        self
+    }
+}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AstErr<'a> {
     UnexecpectedEOF,

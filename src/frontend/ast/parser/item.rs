@@ -5,7 +5,7 @@ use crate::{
         ast::{
             Ast, Function, Item, Line, LinkAttr, LinkMeta,
             cfg::CfgEnv,
-            error::{AstErr, Diagnostics},
+            error::{AstErr, Diagnostics, IntoSpanned, Spanned},
             parser::expr::parse_expr,
         },
         lexer::{Token, TokenStream},
@@ -39,12 +39,20 @@ impl Ast {
                     if matches!(*kw, "link_attr" | "begin_def" | "public" | "extern_def") =>
                 {
                     let mut item_diagnostic = Diagnostics::new();
+                    let link_attr_start = s.peek().span.clone();
                     let link_attr = LinkAttr::parse(s, &mut item_diagnostic);
 
-                    if let Some(f) = Function::parse(s, link_attr, cfg_env, &mut item_diagnostic)
-                        && !skip_next
+                    if let Some(f) = Function::parse(
+                        s,
+                        link_attr.into_spanned(link_attr_start.merge(s.last_span.clone())),
+                        cfg_env,
+                        &mut item_diagnostic,
+                    ) && !skip_next
                     {
-                        functions.insert(f.name.clone(), Item::Function(f));
+                        functions.insert(
+                            f.name.as_ref().clone(),
+                            Item::Function(f.into_spanned(anchor.merge(s.last_span.clone()))),
+                        );
                     }
 
                     diagnostics.warns.append(&mut item_diagnostic.warns);
@@ -193,7 +201,7 @@ impl LinkAttr {
 impl Function {
     fn parse<'a>(
         stream: &mut TokenStream<'a>,
-        link_attr: LinkAttr,
+        link_attr: Spanned<LinkAttr>,
         cfg_env: &CfgEnv,
         diagnostics: &mut Diagnostics<'a>,
     ) -> Option<Self> {
@@ -212,7 +220,7 @@ impl Function {
 
     fn parse_inner<'a>(
         stream: &mut TokenStream<'a>,
-        mut link_attr: LinkAttr,
+        mut link_attr: Spanned<LinkAttr>,
         cfg_env: &CfgEnv,
         diagnostics: &mut Diagnostics<'a>,
     ) -> Option<Self> {
@@ -223,7 +231,7 @@ impl Function {
         if is_public {
             stream.advance();
             kw = stream.peek();
-            link_attr = link_attr.into_pub();
+            link_attr = link_attr.map(|attr| attr.into_pub());
         }
 
         let is_local = match kw.as_ref() {
@@ -241,13 +249,13 @@ impl Function {
         };
 
         if !is_local {
-            link_attr = link_attr.into_external();
+            link_attr = link_attr.map(|attr| attr.into_external());
         }
 
         stream.advance();
 
         let ident = stream.peek();
-        let Token::Ident(ident) = ident.as_ref() else {
+        let Token::Ident(ident_str) = ident.as_ref() else {
             unexpected!(
                 diagnostics,
                 [Token::Ident("<ident>")],
@@ -256,7 +264,7 @@ impl Function {
             );
             return None;
         };
-        let name = ident.to_string();
+        let name = ident_str.to_string().into_spanned(ident.span.clone());
         stream.advance();
 
         let mut args = Vec::new();
@@ -272,7 +280,7 @@ impl Function {
                 return None;
             };
 
-            args.push(ident.to_string());
+            args.push(ident.to_string().into_spanned(stream.peek().span.clone()));
             stream.advance();
 
             let next = stream.peek();
@@ -293,6 +301,7 @@ impl Function {
 
         let body = if is_local {
             let mut body = Vec::new();
+            let body_anchor = stream.peek().span.clone();
 
             while *stream.peek().as_ref() != Token::Keyword("end_def") {
                 if matches!(
@@ -363,7 +372,7 @@ impl Function {
                     );
                 }
             }
-            Some(body)
+            Some(body.into_spanned(body_anchor.merge(stream.last_span.clone())))
         } else {
             None
         };

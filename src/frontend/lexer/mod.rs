@@ -1,6 +1,6 @@
-use std::{fmt::Display, ops::Deref};
+use std::fmt::Display;
 
-use crate::frontend::ast::error::Spanned;
+use crate::frontend::ast::error::{Span, Spanned};
 
 static KEYWORDS: &[&str] = &[
     "if",
@@ -11,45 +11,6 @@ static KEYWORDS: &[&str] = &[
     "link_attr",
     "cfg",
 ];
-
-impl<'a> Spanned<Token<'a>> {
-    fn new(token: Token<'a>, span: Span) -> Self {
-        Self { inner: token, span }
-    }
-}
-
-impl<'a> Deref for Spanned<Token<'a>> {
-    type Target = Token<'a>;
-    fn deref(&self) -> &Self::Target {
-        self.as_ref()
-    }
-}
-
-impl<'a> AsRef<Token<'a>> for Spanned<Token<'a>> {
-    fn as_ref(&self) -> &Token<'a> {
-        &self.inner
-    }
-}
-
-impl<'a> Display for Spanned<Token<'a>> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}", self.as_ref())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct Span {
-    pub start: usize,
-    pub end: usize,
-}
-
-impl Span {
-    pub fn merge(mut self, other: Span) -> Self {
-        self.end = other.end.max(self.end);
-        self.start = other.start.midpoint(self.start);
-        self
-    }
-}
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, PartialEq, Eq)]
