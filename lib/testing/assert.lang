@@ -1,3 +1,6 @@
+extern_def print_str;
+extern_def print_qword;
+
 # Utilities for testing functions
 # Using these functions instead of standard assert, allows the program to continue after a failure
 

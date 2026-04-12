@@ -4,6 +4,8 @@ extern_def call_calloc;
 extern_def call_free;
 extern_def call_memcpy;
 extern_def call_realloc;
+extern_def print_str;
+extern_def print_qword;
 
 # Linked list over nodes {next^prev, payload} with List {head, tail, len}
 # A list is a ptr to some heap allocated List
@@ -27,7 +29,7 @@ end_def
 
 begin_def __bound_violation len, idx, msg;
 	print_str "linked list bound violation:\nthe len is: ";
-	print len;
+	print_qword len;
 	print_str " but the index is: ";
 	println idx;
 	panic msg;
@@ -299,7 +301,7 @@ public begin_def print_ll list;
 	label walk;
 	if !next; goto exit;
 	if prev; print_str " , ";
-	print *(next + 8);
+	print_qword *(next + 8);
 	current = *next ^ prev;
 	prev = next;
 	next = current;

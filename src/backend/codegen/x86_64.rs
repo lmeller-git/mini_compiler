@@ -24,11 +24,7 @@ impl AsmWriter {
         let mut file = File::create(path).unwrap();
         print_if!(1, "writing asm code to {}", path.display());
 
-        writeln!(
-            file,
-            "section .data\n\tformat_int: db \"%ld\", 0\n\tformat_str: db \"%s\", 0\n\tdefault rel"
-        )
-        .unwrap();
+        writeln!(file, "section .data\n\tdefault rel").unwrap();
 
         writeln!(file, "\nsection .text\n\textern printf\n\textern exit\n").unwrap();
 
@@ -128,15 +124,13 @@ impl AsmWriter {
                 }
             }
 
-            // if we are in main inject call to exit, to properly kill the process
+            // if we are in main inject return 0, as the user likely wants to exit with a success code in default
             if func.name == "main" {
-                self.write_in_fn(format_args!("mov edi, 0"));
-                self.write_in_fn(format_args!("call exit"));
-            } else {
-                // add back the previously substracted 8 bytes for return
-                self.write_in_fn(format_args!("add rsp, 8"));
-                self.write_in_fn(format_args!("ret"));
+                self.write_in_fn(format_args!("mov rax, 0"));
             }
+            // add back the previously substracted 8 bytes for return
+            self.write_in_fn(format_args!("add rsp, 8"));
+            self.write_in_fn(format_args!("ret"));
         }
 
         write!(self.fh, "\nsection .bss\n{}", all_vars).unwrap();
@@ -262,11 +256,7 @@ impl AsmWriter {
     }
 
     fn get_func_name<'a>(&self, name: &'a str) -> &'a str {
-        match name {
-            "print" => "printf",
-            "print_str" => "printf",
-            _ => name,
-        }
+        name
     }
 
     // TODO use _ret for return values in addr_of, ...
@@ -279,23 +269,6 @@ impl AsmWriter {
         temps: &mut TempVarStack,
     ) {
         match name {
-            "print" => {
-                self.builtin_print(args, vars, temps, "format_int");
-            }
-            "print_str" => {
-                self.builtin_print(args, vars, temps, "format_str");
-            }
-            "exit" => {
-                if !temps.stack_aligned() {
-                    self.write_in_fn(format_args!("sub rsp, 8"));
-                    temps.inc_stack(8);
-                }
-                self.write_in_fn(format_args!(
-                    "mov edi, {}",
-                    self.get_var_str(&args[0], vars, temps)
-                ));
-                self.write_in_fn(format_args!("call exit"));
-            }
             "return" => {
                 if let Some(ret) = args.first() {
                     self.write_in_fn(format_args!(
@@ -329,48 +302,6 @@ impl AsmWriter {
         if let Some(Operand::Temp(dest)) = ret {
             let temp = self.get_or_init_temp(dest, temps);
             self.write_in_fn(format_args!("mov {}, rax", temp));
-        }
-    }
-
-    fn builtin_print(
-        &mut self,
-        args: &[Operand],
-        vars: &Vars,
-        temps: &mut TempVarStack,
-        formatter: &str,
-    ) {
-        // TODO should also modify temps accordingly
-        if USAGE[Reg::RSI as usize].load(Ordering::Relaxed) {
-            self.write_in_fn(format_args!("push rsi"));
-            temps.inc_stack(8);
-        }
-        if USAGE[Reg::RDI as usize].load(Ordering::Relaxed) {
-            self.write_in_fn(format_args!("push rdi"));
-            temps.inc_stack(8);
-        }
-        let needs_align = !temps.stack_aligned();
-        if needs_align {
-            self.write_in_fn(format_args!("sub rsp, 8"));
-            temps.inc_stack(8);
-        }
-        self.write_in_fn(format_args!(
-            "mov rsi, {}",
-            self.get_var_str(&args[0], vars, temps)
-        ));
-        self.write_in_fn(format_args!("mov rdi, {}", formatter));
-        self.write_in_fn(format_args!("xor rax, rax"));
-        self.write_in_fn(format_args!("call printf"));
-        if USAGE[Reg::RDI as usize].load(Ordering::Relaxed) {
-            self.write_in_fn(format_args!("pop rdi"));
-            temps.dec_stack(8);
-        }
-        if USAGE[Reg::RSI as usize].load(Ordering::Relaxed) {
-            self.write_in_fn(format_args!("pop rsi"));
-            temps.dec_stack(8);
-        }
-        if needs_align {
-            self.write_in_fn(format_args!("add rsp, 8"));
-            temps.dec_stack(8);
         }
     }
 
@@ -660,6 +591,7 @@ impl TempVarStack {
         }
     }
 
+    #[allow(dead_code)]
     fn stack_aligned(&self) -> bool {
         // assuming rel stack == 0 is aligned
         #[allow(clippy::manual_is_multiple_of)]

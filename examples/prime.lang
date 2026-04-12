@@ -1,9 +1,11 @@
 extern_def parse_argv_to_int arg;
 extern_def sqrt;
+extern_def print_str;
+extern_def print_qword;
 
 public begin_def main argc, argv;
 	print_str "we got ";
-	print argc;
+	print_qword argc;
 	print_str " arguments\n";
 
 	if argc < 2; goto exit_;
@@ -11,7 +13,7 @@ public begin_def main argc, argv;
 	parse_argv_to_int *(argv + 8) : number;
 
 	print_str "the number to evaluate: ";
-	print number;
+	print_qword number;
 	print_str "\n";
 
 	if number < 3; goto prime;
@@ -21,7 +23,7 @@ public begin_def main argc, argv;
 	sqrt &upper_bound;
 
 	print_str "the upper bound is: ";
-	print upper_bound;
+	print_qword upper_bound;
 	print_str "\n";
 
 	check = 2;

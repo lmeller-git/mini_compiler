@@ -1,3 +1,35 @@
+extern_def printf;
+extern_def c_call;
+extern_def exit;
+
+# prints message to stdout using fmt via gcc::printf.
+# Usage: print fmt, message;
+public begin_def print fmt, message;
+	addr_of printf : printf_ptr;
+	c_call printf_ptr, fmt, message;
+end_def
+
+# prints a str to stdout via print.
+# This is equivalent to: print "%s", str;
+# Usage: print_str str;
+public begin_def print_str str;
+	print "%s", str;
+end_def
+
+# prints a qwword to stdout via print.
+# This is equivalent to: print "%ld", qword;
+# Usage: print qword;
+public begin_def print_qword qword;
+	print "%ld", qword;
+end_def
+
+# aborts the current process via gcc exit.
+# Usage: process_exit code;
+public begin_def process_exit code;
+    addr_of exit : exit_ptr;
+    c_call exit_ptr, code;
+end_def
+
 # prints all strings in messages
 # messages is a ptr to an array, i.e. an array returned by function arr containing ptrs to stringliterals
 # Usage: print_all messages;
@@ -24,7 +56,7 @@ public begin_def ppanic messages;
 	print_str "Explicit panic:\n";
 	print_all messages;
 	print_str "\nAborting the program...\n";
-	exit 1;
+	process_exit 1;
 end_def
 
 # prints msg and aborts the program
@@ -34,7 +66,7 @@ public begin_def panic msg;
 	print_str "Explicit panic:\n";
 	print_str msg;
 	print_str "\nAborting the program...\n";
-	exit 1;
+	process_exit 1;
 end_def
 
 public begin_def println msg;

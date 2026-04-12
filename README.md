@@ -50,6 +50,8 @@ A basic treesitter implementation for mini_compiler may be found in https://gith
 A simple hello world with mini_compiler could look like this:
 
 ```
+extern_def print_str;
+
 public begin_def main argc, argv;
  name = *argv;
  print_str "hello world from ";
@@ -111,7 +113,7 @@ Valid exprs use basic math operators, parentheses, strlits and pointer derefs/re
 
 ```
 ptr = &0;
-print *ptr + 42;
+print_qword *ptr + 42;
 ```
 
 
@@ -152,9 +154,6 @@ Test runs will automatically inject --cfg test, thus functions annotated with `c
 
 The current supported builtin functions are
 
-- print
-- print_str
-- exit
 - label
 - goto
 - addr_of

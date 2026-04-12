@@ -1,8 +1,11 @@
+extern_def print_str;
+extern_def print_qword;
+
 public begin_def main;
 	answer = 21;
 	real_answer = answer + 84 / 4 - (10 - 10);
 
 	print_str "The answer is: ";
-	print (*&real_answer + 42) / 2;
+	print_qword (*&real_answer + 42) / 2;
 	print_str "\n";
 end_def

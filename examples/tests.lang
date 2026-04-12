@@ -1,6 +1,8 @@
 extern_def println;
 extern_def test_assert;
 extern_def test_assert_eq;
+extern_def print_str;
+extern_def print_qword;
 
 begin_def add x, y, to;
 	*to = x + y;

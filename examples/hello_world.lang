@@ -1,3 +1,5 @@
+extern_def print_str;
+
 # This is a comment
 
 begin_def hello input1, input2;

@@ -5,6 +5,9 @@ extern_def _test_state_set_failed;
 extern_def __start_tests;
 extern_def __stop_tests;
 extern_def test_assert;
+extern_def print_str;
+extern_def print_qword;
+extern_def process_exit;
 
 cfg test;
 link_attr section tests;
@@ -33,9 +36,9 @@ public begin_def __wrap_main;
 	_test_state_reset_flag;
 
 	print_str "Running test ";
-	print i + 1;
+	print_qword i + 1;
 	print_str "/";
-	print n_tests;
+	print_qword n_tests;
 
 	meta = *start;
 
@@ -66,6 +69,6 @@ public begin_def __wrap_main;
 	goto test_loop;
 
 	label end_loop;
-	exit tests_failed;
+	process_exit tests_failed;
 end_def
 

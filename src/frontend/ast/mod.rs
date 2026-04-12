@@ -7,10 +7,7 @@ pub mod error;
 pub mod parser;
 
 pub(crate) fn is_builtin_func(ident: &str) -> bool {
-    matches!(
-        ident,
-        "print_str" | "print" | "exit" | "goto" | "label" | "addr_of" | "asm" | "return"
-    )
+    matches!(ident, "goto" | "label" | "addr_of" | "asm" | "return")
 }
 
 pub struct Ast {

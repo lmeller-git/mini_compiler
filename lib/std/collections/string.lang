@@ -12,6 +12,8 @@ extern_def vec_get;
 extern_def vec_set;
 extern_def call_memmove;
 extern_def call_memcpy;
+extern_def print_str;
+extern_def print_qword;
 
 # A String is just a Vec, where each element holds 8 ascii chars
 # The first slot holds the len
@@ -42,9 +44,9 @@ end_def
 # Usage __bound_violation length, idx, msg;
 begin_def __bound_violation length, idx, msg;
 	print_str "str bound violation:\nthe len is: ";
-	print length;
+	print_qword length;
 	print_str " but the index is: ";
-	print idx;
+	print_qword idx;
 	print_str "\n";
 	panic msg;
 end_def

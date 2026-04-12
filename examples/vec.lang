@@ -8,6 +8,7 @@ extern_def vec_remove;
 extern_def print_vec;
 extern_def vec_drop;
 extern_def println;
+extern_def print_str;
 
 
 public begin_def main;

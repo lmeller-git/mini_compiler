@@ -1,3 +1,6 @@
+extern_def print_str;
+extern_def print_qword;
+
 public begin_def main;
 	descriptor = "\nthe value is now: ";
 
@@ -6,23 +9,23 @@ public begin_def main;
 	value_ref = &value;
 
 	print_str descriptor;
-	print value;
+	print_qword value;
 	print_str "\nthe value ref points to: ";
 	print *value_ref;
 
 	*value_ref = *value_ref * 2;
 
 	print_str descriptor;
-	print value;
+	print_qword value;
 
 	value_ref_ref = &value_ref;
 	**value_ref_ref = value - (*value_ref / 2);
 
 	print_str descriptor;
-	print **value_ref_ref;
+	print_qword **value_ref_ref;
 
 	print_str descriptor;
-	print value;
+	print_qword value;
 
 
 	descriptor_slice = descriptor + 19;

@@ -1,3 +1,6 @@
+extern_def print_str;
+extern_def print_qword;
+
 public begin_def main;
 	print_str "--- Testing Bitwise & Logic ---\n";
 
@@ -12,9 +15,9 @@ public begin_def main;
 	power = 1 << counter;
 
 	print_str "2^";
-	print counter;
+	print_qword counter;
 	print_str " = ";
-	print power;
+	print_qword power;
 	print_str "\n";
 
 	is_odd = counter & 1;
@@ -33,7 +36,7 @@ public begin_def main;
 	scrambled = scrambled >> 2;
 
 	print_str "Scrambled: ";
-	print scrambled;
+	print_qword scrambled;
 	print_str "\n";
 
 	counter = counter + 1;

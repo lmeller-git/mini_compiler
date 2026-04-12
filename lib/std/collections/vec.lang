@@ -8,8 +8,8 @@ extern_def call_memcpy;
 extern_def call_memmove;
 extern_def call_memset;
 extern_def println;
-# extern_def arr;
-# extern_def set;
+extern_def print_str;
+extern_def print_qword;
 
 # Vectors store cap at vec_ptr - 16 and length at vec_ptr - 8
 
@@ -59,9 +59,9 @@ end_def
 # Usage __bound_violation length, idx, msg;
 begin_def __bound_violation length, idx, msg;
 	print_str "vec bound violation:\nthe len is: ";
-	print length;
+	print_qword length;
 	print_str " but the index is: ";
-	print idx;
+	print_qword idx;
 	print_str "\n";
 	panic msg;
 end_def
@@ -162,7 +162,7 @@ public begin_def print_vec vector;
 	i = 0;
 	label print_loop;
 	if i > 0; print_str ", ";
-	print *(vector + i * 8);
+	print_qword *(vector + i * 8);
 	i = i + 1;
 	if i < *(vector - 8); goto print_loop;
 

@@ -1,3 +1,5 @@
+extern_def print_qword;
+extern_def print_str;
 
 public begin_def main;
 	hello_world = "hello world\n";
@@ -9,7 +11,7 @@ public begin_def main;
 
 	if x % 2; goto not_print_x;
 	print_str "x == ";
-	print x;
+	print_qword x;
 	print_str "\n";
 
 	label not_print_x;

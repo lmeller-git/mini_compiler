@@ -7,6 +7,9 @@ extern_def ll_remove;
 extern_def ll_insert;
 extern_def print_ll;
 extern_def println;
+extern_def print_str;
+extern_def print_qword;
+
 
 public begin_def main;
     linked_list : ll;

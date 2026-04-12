@@ -1,4 +1,6 @@
 extern_def panic msg;
+extern_def print_str;
+extern_def print_qword;
 
 # Swaps the pointee of in to a pointer to an array of size len bytes.
 # Usage: arr len : in;
@@ -74,7 +76,7 @@ public begin_def print_arr array;
 	element = *(array + i * 8);
 
 	if i > 0; print_str ", ";
-	print element;
+	print_qword element;
 	i = i + 1;
 
 	if !(i < len); goto end_print;
