@@ -2,7 +2,6 @@
 
 A minimal example compiler
 
-
 ## Quickstart
 
 Clone this repository and run:
@@ -11,7 +10,6 @@ Clone this repository and run:
  cargo run --release -- examples/hello_world.lang
  ./target/a.out
 ```
-
 
 ## Usage
 
@@ -38,6 +36,10 @@ All children of directories with extension `ext` will be compiled.
 Run tests easily with `cargo run --release -- <files> --test`
 
 To call functions via FFI, use `c_call` or `c_call_arr` in `lib/std/ffi.asm`
+
+## LSP
+
+A basic LSP implementation for mini_compiler may be found in https://github.com/lmeller-git/mini_compiler_lsp.
 
 ## Syntax
 

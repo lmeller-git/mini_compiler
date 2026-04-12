@@ -1,0 +1,12 @@
+[language-server.mini-compiler-lsp]
+command = "../mini_compiler_lsp/target/debug/mini_compiler_lsp"
+args = []
+
+[[language]]
+name = "mini_compiler_language"
+scope = "source.mini_compiler_language"
+injection-regex = "mini_compiler_language|lang"
+file-types = ["lang"]
+language-servers = [ "mini-compiler-lsp" ]
+comment-tokens = ["#"]
+grammar = "mini_compiler_language"

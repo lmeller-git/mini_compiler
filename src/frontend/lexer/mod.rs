@@ -257,6 +257,7 @@ impl<'a> TokenStream<'a> {
         self.inner.push(token);
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &'a str) -> Result<Self, LexErr> {
         let mut stream = Self::new();
         let mut total_parsed = 0;
