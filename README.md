@@ -41,6 +41,10 @@ To call functions via FFI, use `c_call` or `c_call_arr` in `lib/std/ffi.asm`
 
 A basic LSP implementation for mini_compiler may be found in https://github.com/lmeller-git/mini_compiler_lsp.
 
+## Treesitter
+
+A basic treesitter implementation for mini_compiler may be found in https://github.com/lmeller-git/mini_compiler_treesitter.
+
 ## Syntax
 
 A simple hello world with mini_compiler could look like this:
@@ -53,7 +57,6 @@ public begin_def main argc, argv;
  print_str "\n";
 end_def
 ```
-
 
 Declare a variable with:
 

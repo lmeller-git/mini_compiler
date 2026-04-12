@@ -2,6 +2,10 @@
 command = "../mini_compiler_lsp/target/debug/mini_compiler_lsp"
 args = []
 
+[[grammar]]
+name = "mini_compiler_language"
+source = { git = "https://github.com/lmeller-git/mini_compiler_treesitter", rev = "main" }
+
 [[language]]
 name = "mini_compiler_language"
 scope = "source.mini_compiler_language"
