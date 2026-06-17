@@ -1,3 +1,6 @@
+![CI Test](https://github.com/lmeller-git/mini_compiler/actions/workflows/test.yml/badge.svg?branch=main)
+![Std lib Test](https://github.com/lmeller-git/mini_compiler/actions/workflows/test_lib.yml/badge.svg?branch=main)
+
 # mini_compiler
 
 A minimal example compiler
