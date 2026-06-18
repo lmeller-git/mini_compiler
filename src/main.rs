@@ -80,6 +80,8 @@ fn main() {
         cfg_env = cfg_env.populate(&["test".into()]);
     }
 
+    let env_hash = fxhash::hash64(&cfg_env.as_list());
+
     let target_dir = PathBuf::from(args.target);
     if let Err(e) = fs::create_dir_all(&target_dir) {
         panic!(
@@ -128,9 +130,9 @@ fn main() {
 
             create_dir_all(obj_path.parent().unwrap()).unwrap();
 
-            let needs_recompile = true; //args.clean || needs_recompile(file, &obj_path).unwrap();
+            let needs_recompile = args.clean || needs_recompile(file, &obj_path).unwrap();
 
-            if needs_recompile && ext != "asm" {
+            if (needs_recompile || stale_meta(&obj_path, env_hash).unwrap()) && ext != "asm" {
                 print_if!(
                     0,
                     "\x1b[1;32mCompiling\x1b[0m {}\t\x1b[34m( -> {})\x1b[0m",
@@ -153,7 +155,14 @@ fn main() {
                 let code = backend::generate(&ast).unwrap();
                 print_if!(2, "IR for {}: {:#?}", f_name, code);
 
+                rm_stale_env_meta(&obj_path).unwrap();
                 backend::asm_gen(code, asm_path).unwrap();
+
+                let env_meta_path = obj_path
+                    .with_extension(format!("{:x}", env_hash))
+                    .with_added_extension("meta");
+
+                File::create(env_meta_path).unwrap();
             }
 
             if needs_recompile {
@@ -198,6 +207,37 @@ fn main() {
         "\x1b[1;32mFinished\x1b[0m Binary in {}",
         final_binary.display()
     );
+}
+
+fn rm_stale_env_meta(target_obj: &Path) -> Result<(), io::Error> {
+    let stem = target_obj.with_extension("");
+    let parent_dir = target_obj.parent().unwrap();
+
+    if !parent_dir.exists() {
+        return Ok(());
+    }
+
+    let file_prefix = stem.file_name().unwrap().to_string_lossy();
+
+    for entry in fs::read_dir(target_obj.parent().unwrap())? {
+        let p = entry?.path();
+        if p.extension().is_some_and(|ext| ext == "meta")
+            && p.file_stem()
+                .is_some_and(|s| s.to_string_lossy().starts_with(file_prefix.as_ref()))
+        {
+            fs::remove_file(p)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn stale_meta(target_obj: &Path, env_hash: u64) -> Result<bool, io::Error> {
+    let env_meta_path = target_obj
+        .with_extension(format!("{:x}", env_hash))
+        .with_added_extension("meta");
+
+    Ok(!env_meta_path.exists())
 }
 
 fn needs_recompile(source: &Path, target_obj: &Path) -> Result<bool, io::Error> {

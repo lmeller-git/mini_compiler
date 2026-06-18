@@ -61,6 +61,17 @@ impl CfgEnv {
             Expr::Malformed => false,
         }
     }
+
+    pub fn as_list(&self) -> Vec<String> {
+        let mut entries: Vec<String> = self
+            .flags
+            .iter()
+            .cloned()
+            .chain(self.mappings.iter().map(|(k, v)| format!("{k}={v}")))
+            .collect();
+        entries.sort();
+        entries
+    }
 }
 
 #[allow(clippy::derivable_impls)]
