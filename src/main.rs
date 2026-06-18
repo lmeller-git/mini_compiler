@@ -128,7 +128,7 @@ fn main() {
 
             create_dir_all(obj_path.parent().unwrap()).unwrap();
 
-            let needs_recompile = args.clean || needs_recompile(file, &obj_path).unwrap();
+            let needs_recompile = true; //args.clean || needs_recompile(file, &obj_path).unwrap();
 
             if needs_recompile && ext != "asm" {
                 print_if!(

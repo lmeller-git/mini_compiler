@@ -69,7 +69,8 @@ public begin_def panic msg;
 	process_exit 1;
 end_def
 
+# prints an integer and a newline
 public begin_def println msg;
-	print msg;
+	print "%d", msg;
 	print_str "\n";
 end_def
