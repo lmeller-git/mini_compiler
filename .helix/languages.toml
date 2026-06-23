@@ -1,5 +1,5 @@
 [language-server.mini-compiler-lsp]
-command = "../mini_compiler_lsp/target/debug/mini_compiler_lsp"
+command = "../mini_compiler_lsp/target/release/mini_compiler_lsp"
 args = []
 
 [[grammar]]
