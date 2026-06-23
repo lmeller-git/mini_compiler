@@ -162,6 +162,7 @@ end_def
 # Tests
 cfg test;
 extern_def test_assert;
+
 cfg test;
 extern_def test_assert_eq;
 

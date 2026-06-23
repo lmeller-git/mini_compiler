@@ -130,9 +130,11 @@ fn main() {
 
             create_dir_all(obj_path.parent().unwrap()).unwrap();
 
-            let needs_recompile = args.clean || needs_recompile(file, &obj_path).unwrap();
+            let needs_recompile = args.clean
+                || needs_recompile(file, &obj_path).unwrap()
+                || stale_meta(&obj_path, env_hash).unwrap();
 
-            if (needs_recompile || stale_meta(&obj_path, env_hash).unwrap()) && ext != "asm" {
+            if needs_recompile && ext != "asm" {
                 print_if!(
                     0,
                     "\x1b[1;32mCompiling\x1b[0m {}\t\x1b[34m( -> {})\x1b[0m",
